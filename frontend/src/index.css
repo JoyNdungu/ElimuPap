@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
+  body {
+    background-color: #13131f;
+    color: #ffffff;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+  }
+  a { transition: color 0.2s; }
+  input, textarea, select { font-family: 'Inter', system-ui, sans-serif; }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-medium rounded-xl
+           transition-all duration-200 focus:outline-none focus-visible:ring-2
+           focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed
+           active:scale-[0.97] select-none;
+  }
+  /* Primary — exact #5B57FF from Stitch */
+  .btn-primary {
+    background-color: #5B57FF;
+    color: #ffffff;
+    @apply focus-visible:ring-[#5B57FF];
+  }
+  .btn-primary:hover { background-color: #7571ff; }
+
+  .btn-secondary {
+    @apply border text-white focus-visible:ring-[#5B57FF];
+    border-color: #2d2d4a;
+    background-color: transparent;
+  }
+  .btn-secondary:hover { background-color: #22223a; border-color: #3b3b5e; }
+
+  .btn-ghost {
+    color: #9898c0;
+    @apply focus-visible:ring-[#5B57FF];
+  }
+  .btn-ghost:hover { background-color: #1a1a2e; color: #ffffff; }
+
+  .btn-sm  { @apply text-xs px-3 py-2; }
+  .btn-md  { @apply text-sm px-4 py-2.5; }
+  .btn-lg  { @apply text-sm px-6 py-3.5 rounded-xl; }
+  .btn-xl  { @apply text-base px-8 py-4; }
+
+  .card {
+    background-color: #1a1a2e;
+    border: 1px solid #2d2d4a;
+    @apply rounded-2xl p-5;
+  }
+  .card-hover {
+    background-color: #1a1a2e;
+    border: 1px solid #2d2d4a;
+    @apply rounded-2xl p-5 transition-all duration-200 cursor-pointer;
+  }
+  .card-hover:hover { background-color: #22223a; border-color: #3b3b5e; }
+
+  .input {
+    @apply w-full rounded-xl px-4 py-3 text-sm transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-[#5B57FF] focus:border-transparent
+           disabled:cursor-not-allowed;
+    background-color: #1a1a2e;
+    border: 1px solid #2d2d4a;
+    color: #ffffff;
+  }
+  .input::placeholder { color: #7070b0; }
+  .input-error { border-color: rgba(239,68,68,0.6) !important; }
+  .input:focus.input-error { --tw-ring-color: rgb(239,68,68); }
+
+  .label {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #9898c0;
+    margin-bottom: 0.375rem;
+  }
+  .error-message { @apply text-xs mt-1.5 flex items-center gap-1; color: #f87171; }
+
+  .alert-error {
+    @apply flex items-start gap-3 rounded-xl p-4 text-sm;
+    background-color: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.25);
+    color: #fca5a5;
+  }
+
+  .section-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #7070b0;
+  }
+
+  .page-container { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+  .divider { border-top: 1px solid #2d2d4a; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #2d2d4a; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #3b3b5e; }
+
+/* Animations */
+.animate-fade-in  { animation: fadeIn 0.4s ease-out both; }
+.animate-slide-up { animation: slideUp 0.45s ease-out both; }
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+.animate-pulse-soft { animation: pulseSoft 2s ease-in-out infinite; }
+@keyframes pulseSoft { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+
+.delay-75  { animation-delay: 75ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-225 { animation-delay: 225ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-375 { animation-delay: 375ms; }
+
+@media print {
+  aside, nav, header, form, .border-b, button, .tabs {
+    display: none !important;
+  }
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: #13131f !important;
+    color: #ffffff !important;
+  }
+  .flex-1 {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  /* Ensure page breaks are handled nicely */
+  .mb-8 {
+    page-break-inside: avoid;
+  }
+}
