@@ -25,9 +25,14 @@ COLLECTIONS = [
     "quiz_attempts",
     "weak_topics",
     "study_plans",
+    "exams",
     "units",
     "focus_areas",
     "chat_sessions",
+    "srs_flashcards",
+    "past_papers",
+    "study_sessions",
+    "activity_logs",
 ]
 
 print("🚀 Initializing ElimuPap database...\n")
@@ -82,6 +87,28 @@ print("  ✅ study_plans.user_id")
 # units — lookup by user
 db["units"].create_index([("user_id", ASCENDING)], name="units_user_id")
 print("  ✅ units.user_id")
+
+# exams — lookup by user & date
+db["exams"].create_index([("user_id", ASCENDING), ("exam_date", ASCENDING)], name="exams_user_id_date")
+print("  ✅ exams.user_id & exam_date")
+
+# srs_flashcards — lookup by user & review date
+db["srs_flashcards"].create_index([("user_id", ASCENDING), ("next_review", ASCENDING)], name="srs_flashcards_user_review")
+print("  ✅ srs_flashcards.user_id & next_review")
+
+# past_papers — lookup by unit code
+db["past_papers"].create_index([("unit_code", ASCENDING), ("year", ASCENDING)], name="past_papers_unit_year")
+print("  ✅ past_papers.unit_code & year")
+
+# study_sessions — lookup by user
+db["study_sessions"].create_index([("user_id", ASCENDING)], name="study_sessions_user_id")
+print("  ✅ study_sessions.user_id")
+
+# activity_logs — lookup for telemetry by user and type/timestamp/unit
+db["activity_logs"].create_index([("user_id", ASCENDING), ("timestamp", ASCENDING)], name="activity_logs_user_id_timestamp")
+db["activity_logs"].create_index([("user_id", ASCENDING), ("type", ASCENDING)], name="activity_logs_user_id_type")
+db["activity_logs"].create_index([("user_id", ASCENDING), ("unit_code", ASCENDING)], name="activity_logs_user_id_unit_code")
+print("  ✅ activity_logs.user_id, timestamp, type & unit_code")
 
 print("\n🎉 Database initialization complete!")
 print(f"   Collections in database: {db.list_collection_names()}")

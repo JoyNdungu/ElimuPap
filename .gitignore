@@ -1,6 +1,9 @@
 # Frontend (Node.js/React)
 frontend/node_modules/
 frontend/dist/
+.env
+.env.*
+!.env.example
 frontend/.env
 frontend/.env.local
 frontend/.env.development.local
@@ -13,10 +16,10 @@ frontend/yarn-error.log*
 # Backend (Python/FastAPI)
 backend/venv/
 backend/env/
-backend/__pycache__/
-backend/*.pyc
-backend/*.pyo
-backend/*.pyd
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 backend/.Python
 backend/pip-log.txt
 backend/pip-delete-this-directory.txt
@@ -33,8 +36,13 @@ backend/.env
 
 # Uploads and Database
 backend/uploads/
+backend/converted/
 *.db
 *.sqlite3
+
+# Scratch / local test artifacts
+scratch_test.py
+/New Microsoft Word Document.docx
 
 # IDE and OS files
 .vscode/

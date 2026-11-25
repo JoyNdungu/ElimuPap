@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
 
 export default function UploadNotesPage() {
+  const { isDark } = useTheme();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const location = useLocation();
@@ -21,6 +23,9 @@ export default function UploadNotesPage() {
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'image/jpeg',
+    'image/png',
+    'image/webp'
   ];
 
   useEffect(() => {
@@ -37,7 +42,7 @@ export default function UploadNotesPage() {
   }, []);
 
   const isValidFile = (f) =>
-    VALID_TYPES.includes(f.type) || /\.(pdf|docx|pptx)$/i.test(f.name);
+    VALID_TYPES.includes(f.type) || /\.(pdf|docx|pptx|png|jpg|jpeg|webp)$/i.test(f.name);
 
   const addFiles = (incoming) => {
     const valid = Array.from(incoming).filter(isValidFile);
@@ -48,12 +53,11 @@ export default function UploadNotesPage() {
     if (hasLegacy) {
       setError(`Legacy formats (.doc, .ppt) are too old to be read by our AI. Please open them and "Save As" .docx, .pptx, or .pdf!`);
     } else if (invalid.length) {
-      setError(`${invalid.length} file(s) skipped — only PDF, DOCX, or PPTX are allowed.`);
+      setError(`${invalid.length} file(s) skipped — only PDF, DOCX, PPTX, or Image (JPEG/PNG) files are allowed.`);
     } else {
       setError('');
     }
     setFiles(prev => {
-      // deduplicate by name
       const names = new Set(prev.map(f => f.name));
       return [...prev, ...valid.filter(f => !names.has(f.name))];
     });
@@ -86,10 +90,13 @@ export default function UploadNotesPage() {
       formData.append('file', file);
       formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
       formData.append('unit_code', selectedUnit);
-      formData.append('topic', '');  // topic is optional now
+      formData.append('topic', '');
+
+      const isImage = /\.(png|jpg|jpeg|webp)$/i.test(file.name) || file.type.startsWith('image/');
+      const endpoint = isImage ? '/ai/ocr' : '/notes/upload';
 
       try {
-        await api.post('/notes/upload', formData, {
+        await api.post(endpoint, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
             'Authorization': `Bearer ${token}`,
@@ -112,22 +119,29 @@ export default function UploadNotesPage() {
     }
   };
 
+
   const successCount = uploadResults.filter(r => r.ok).length;
   const failCount = uploadResults.filter(r => !r.ok).length;
   const allDone = uploadResults.length > 0;
 
   return (
-    <div className="flex min-h-dvh font-sans" style={{ backgroundColor: '#13131f' }}>
+    <div
+      className="flex flex-col lg:flex-row min-h-dvh font-sans transition-colors"
+      style={{
+        backgroundColor: isDark ? '#13131f' : '#f8fafc',
+        color: isDark ? '#ffffff' : '#0f172a',
+      }}
+    >
       <Sidebar />
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
-        <main className="max-w-[720px] mx-auto px-6 sm:px-10 py-10">
+      <div className="flex-1 overflow-y-auto pb-28 lg:pb-10 min-w-0">
+        <main className="max-w-[720px] mx-auto px-4 sm:px-10 py-6 sm:py-10">
 
           {/* Header */}
-          <header className="mb-10 animate-fade-in">
-            <h1 className="font-display text-[2.5rem] text-white leading-none mb-3 tracking-tight">
+          <header className="mb-8 sm:mb-10 animate-fade-in">
+            <h1 className={`font-display text-2xl sm:text-[2.5rem] leading-tight mb-2 sm:mb-3 tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Upload Notes
             </h1>
-            <p className="text-[14px] leading-relaxed" style={{ color: '#9ca3af' }}>
+            <p className={`text-[14px] leading-relaxed ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
               Upload one or multiple files at once. ElimuPap will extract the text and power your ElimuPap Tutor, summaries, and quizzes.
             </p>
           </header>
@@ -142,8 +156,10 @@ export default function UploadNotesPage() {
               onDrop={handleDrop}
               className="relative rounded-2xl border-2 border-dashed flex flex-col items-center justify-center p-10 text-center cursor-pointer transition-all"
               style={{
-                borderColor: isDragging ? '#5B57FF' : files.length ? '#5B57FF' : 'rgba(255,255,255,0.1)',
-                backgroundColor: isDragging ? 'rgba(91,87,255,0.07)' : 'transparent',
+                borderColor: isDragging || files.length ? '#2563EB' : (isDark ? 'rgba(255,255,255,0.12)' : '#cbd5e1'),
+                backgroundColor: isDragging
+                  ? (isDark ? 'rgba(37,99,235,0.1)' : '#eff6ff')
+                  : (isDark ? '#1F1F2A' : '#ffffff'),
               }}>
               <input
                 ref={fileInputRef}
@@ -153,69 +169,74 @@ export default function UploadNotesPage() {
                 className="hidden"
                 onChange={handleFileInput}
               />
-              <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
-                style={{ backgroundColor: isDragging ? 'rgba(91,87,255,0.2)' : '#1e1e2a' }}>
-                <svg className="w-6 h-6" style={{ color: isDragging || files.length ? '#7571ff' : '#6b7280' }}
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center mb-4 border"
+                style={{
+                  backgroundColor: isDragging || files.length
+                    ? (isDark ? 'rgba(37,99,235,0.2)' : '#eff6ff')
+                    : (isDark ? '#11111a' : '#f8fafc'),
+                  borderColor: isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0',
+                }}
+              >
+                <svg className="w-6 h-6" style={{ color: isDragging || files.length ? '#2563EB' : '#64748b' }}
                   fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
                 </svg>
               </div>
-              <p className="text-[14px] font-medium text-white mb-1">
+              <p className={`text-[14px] font-medium mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {isDragging ? 'Drop files here' : 'Click to upload or drag and drop'}
               </p>
-              <p className="text-[12px]" style={{ color: '#6b7280' }}>PDF, DOCX, or PPTX — select as many as you like</p>
+              <p className="text-[12px] text-slate-500">PDF, DOCX, or PPTX — select as many as you like</p>
             </div>
 
             {error && (
-              <p className="text-red-400 text-sm">{error}</p>
+              <p className={`text-sm ${isDark ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
             )}
 
             {/* ── File Queue ── */}
             {files.length > 0 && (
-              <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: '#1F1F2A', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <div className="px-5 py-3 flex items-center justify-between"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', backgroundColor: '#22222d' }}>
-                  <span className="text-sm font-medium text-white">{files.length} file{files.length > 1 ? 's' : ''} selected</span>
+              <div className={`rounded-2xl overflow-hidden border shadow-sm ${isDark ? 'bg-[#1F1F2A] border-white/5' : 'bg-white border-slate-200'}`}>
+                <div className={`px-5 py-3 flex items-center justify-between border-b ${isDark ? 'bg-[#22222d] border-white/5' : 'bg-[#f8fafc] border-slate-200'}`}>
+                  <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    {files.length} file{files.length > 1 ? 's' : ''} selected
+                  </span>
                   <button type="button" onClick={() => { setFiles([]); setUploadResults([]); }}
-                    className="text-xs font-medium transition-colors" style={{ color: '#f87171' }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#fca5a5'}
-                    onMouseLeave={e => e.currentTarget.style.color = '#f87171'}>
+                    className={`text-xs font-medium transition-colors ${isDark ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'}`}>
                     Clear all
                   </button>
                 </div>
-                <ul className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                <ul className={`divide-y ${isDark ? 'divide-white/5' : 'divide-slate-200'}`}>
                   {files.map((file, idx) => {
                     const result = uploadResults[idx];
                     return (
                       <li key={idx} className="flex items-center gap-3 px-5 py-3">
                         {/* File icon */}
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: 'rgba(91,87,255,0.1)' }}>
-                          <svg className="w-4 h-4 text-[#7571ff]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-[#2563EB]/15' : 'bg-blue-50 border border-blue-100'}`}>
+                          <svg className="w-4 h-4 text-[#2563EB]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                           </svg>
                         </div>
                         {/* Name + size */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] text-white truncate">{file.name}</p>
-                          <p className="text-[11px]" style={{ color: '#6b7280' }}>{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          <p className={`text-[13px] truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{file.name}</p>
+                          <p className="text-[11px] text-slate-500">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
                         </div>
                         {/* Status indicator */}
                         {result && (
                           result.ok ? (
-                            <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: '#34d399' }}>
+                            <span className={`flex items-center gap-1 text-[11px] font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                               </svg>
                               Done
                             </span>
                           ) : (
-                            <span className="text-[11px] font-medium" style={{ color: '#f87171' }} title={result.error}>Failed</span>
+                            <span className={`text-[11px] font-medium ${isDark ? 'text-red-400' : 'text-red-600'}`} title={result.error}>Failed</span>
                           )
                         )}
                         {/* Uploading spinner */}
                         {isUploading && !result && (
-                          <svg className="w-4 h-4 animate-spin text-[#5B57FF]" fill="none" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 animate-spin text-[#2563EB]" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
                           </svg>
@@ -223,7 +244,7 @@ export default function UploadNotesPage() {
                         {/* Remove button (when not uploading) */}
                         {!isUploading && !result && (
                           <button type="button" onClick={() => removeFile(idx)}
-                            className="text-gray-500 hover:text-red-400 transition-colors flex-shrink-0">
+                            className={`transition-colors flex-shrink-0 ${isDark ? 'text-gray-500 hover:text-red-400' : 'text-slate-400 hover:text-red-600'}`}>
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -238,21 +259,23 @@ export default function UploadNotesPage() {
 
             {/* ── Unit Selector ── */}
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.1em] mb-2" style={{ color: '#9898c0' }}>
-                Registered Unit <span className="normal-case font-normal text-gray-500">(optional)</span>
+              <label className={`block text-[10px] font-bold uppercase tracking-[0.1em] mb-2 ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
+                Registered Unit <span className="normal-case font-normal text-slate-500">(optional)</span>
               </label>
               <select
                 value={selectedUnit}
                 onChange={e => setSelectedUnit(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#5B57FF]"
-                style={{ backgroundColor: '#11111a', border: '1px solid #2d2d4a' }}>
+                className={`w-full px-4 py-2.5 rounded-lg text-sm border focus:outline-none focus:ring-1 focus:ring-[#2563EB] ${
+                  isDark ? 'bg-[#11111a] border-[#2d2d4a] text-white' : 'bg-white border-slate-200 text-slate-900'
+                }`}
+              >
                 <option value="">-- No unit selected --</option>
                 {units.map(u => (
                   <option key={u.id} value={u.unit_code}>{u.unit_code} — {u.unit_name}</option>
                 ))}
               </select>
               {units.length === 0 && (
-                <p className="text-[11px] mt-2 text-yellow-500">
+                <p className={`text-[11px] mt-2 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
                   No units registered yet. <a href="/units" className="underline font-semibold">Add a unit first</a> to organise your notes.
                 </p>
               )}
@@ -260,12 +283,11 @@ export default function UploadNotesPage() {
 
             {/* ── Upload result summary ── */}
             {allDone && (
-              <div className="p-4 rounded-xl text-sm flex items-center gap-3"
-                style={{
-                  backgroundColor: failCount === 0 ? 'rgba(52,211,153,0.1)' : 'rgba(251,191,36,0.1)',
-                  border: `1px solid ${failCount === 0 ? 'rgba(52,211,153,0.2)' : 'rgba(251,191,36,0.2)'}`,
-                  color: failCount === 0 ? '#34d399' : '#fbbf24'
-                }}>
+              <div className={`p-4 rounded-xl text-sm flex items-center gap-3 border ${
+                failCount === 0
+                  ? (isDark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-700')
+                  : (isDark ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-700')
+              }`}>
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   {failCount === 0
                     ? <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -283,10 +305,8 @@ export default function UploadNotesPage() {
             <button
               type="submit"
               disabled={isUploading || files.length === 0}
-              className="w-full py-3 rounded-xl flex justify-center items-center gap-2 text-sm font-semibold transition-all disabled:opacity-50"
-              style={{ backgroundColor: '#5B57FF', color: '#fff' }}
-              onMouseEnter={e => !isUploading && (e.currentTarget.style.backgroundColor = '#7571ff')}
-              onMouseLeave={e => !isUploading && (e.currentTarget.style.backgroundColor = '#5B57FF')}>
+              className="w-full py-3 rounded-xl flex justify-center items-center gap-2 text-sm font-semibold transition-all disabled:opacity-50 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm"
+            >
               {isUploading ? (
                 <>
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">

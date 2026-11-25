@@ -71,13 +71,13 @@ export default function UnitsPage() {
   };
 
   return (
-    <div className="flex min-h-dvh font-sans" style={{ backgroundColor: '#17171F' }}>
+    <div className="flex flex-col lg:flex-row min-h-dvh font-sans" style={{ backgroundColor: '#17171F' }}>
       <Sidebar />
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10 relative">
-        <main className="max-w-[1000px] mx-auto px-6 sm:px-10 py-10">
+      <div className="flex-1 overflow-y-auto pb-28 lg:pb-10 relative min-w-0">
+        <main className="max-w-[1000px] mx-auto px-4 sm:px-10 py-6 sm:py-10">
           
-          <header className="mb-10 animate-fade-in">
-            <h1 className="font-display text-[2.5rem] text-white leading-none mb-3 tracking-tight">
+          <header className="mb-8 sm:mb-10 animate-fade-in">
+            <h1 className="font-display text-2xl sm:text-[2.5rem] text-white leading-tight mb-2 sm:mb-3 tracking-tight">
               My Semester Units
             </h1>
             <p className="text-[14px] leading-relaxed" style={{ color: '#9ca3af' }}>

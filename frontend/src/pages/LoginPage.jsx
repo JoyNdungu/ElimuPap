@@ -16,10 +16,10 @@ export default function LoginPage() {
   const location = useLocation();
   const from = location.state?.from?.pathname || '/dashboard';
 
-  const [fields, setFields]     = useState({ email: '', password: '' });
-  const [errors, setErrors]     = useState({});
+  const [fields, setFields] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
-  const [loading, setLoading]   = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function LoginPage() {
       </div>
 
       {/* Card */}
-      <div 
+      <div
         className="w-full max-w-[420px] rounded-xl p-8 sm:p-10 animate-slide-up"
         style={{ backgroundColor: '#1a1a2e', border: '1px solid #2d2d4a' }}
       >
@@ -85,7 +85,7 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleSubmit} noValidate aria-label="Login form">
-          
+
           {/* Email Field */}
           <div className="mb-5">
             <label className="block text-[10px] font-bold uppercase tracking-[0.1em] mb-2" style={{ color: '#9898c0' }} htmlFor="login-email">
@@ -171,9 +171,9 @@ export default function LoginPage() {
             onMouseLeave={e => e.currentTarget.style.backgroundColor = '#5B57FF'}
           >
             {loading ? (
-              <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Signing in…</>
+              <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Signing in…</>
             ) : (
-              <>Log In <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg></>
+              <>Log In <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg></>
             )}
           </button>
         </form>

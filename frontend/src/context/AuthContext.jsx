@@ -34,6 +34,14 @@ export function AuthProvider({ children }) {
   const clearSession = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem('elimupap_offline_meta');
+    localStorage.removeItem('elimupap_sync_queue');
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('elimupap_cache:'))
+      .forEach((k) => localStorage.removeItem(k));
+    if (typeof caches !== 'undefined') {
+      caches.delete('elimupap-files-v1').catch(() => {});
+    }
     setToken(null);
     setUser(null);
   }, []);
@@ -66,9 +74,12 @@ export function AuthProvider({ children }) {
         setUser(res.data);
         localStorage.setItem(USER_KEY, JSON.stringify(res.data));
       })
-      .catch(() => {
-        // Token invalid or expired — clear everything
-        clearSession();
+      .catch((err) => {
+        // Only clear session if the server explicitly rejected the token (401/404).
+        // If offline (no err.response), keep the cached user active for offline study.
+        if (err?.response?.status === 401 || err?.response?.status === 404) {
+          clearSession();
+        }
       })
       .finally(() => {
         setLoading(false);

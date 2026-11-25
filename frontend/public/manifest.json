@@ -1,0 +1,16 @@
+{
+  "name": "ElimuPap — Academic Study Suite",
+  "short_name": "ElimuPap",
+  "description": "AI-powered academic assistant for university students with offline note & summary access.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111318",
+  "theme_color": "#2563EB",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

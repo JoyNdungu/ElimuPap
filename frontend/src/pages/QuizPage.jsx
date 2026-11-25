@@ -106,10 +106,10 @@ export default function QuizPage() {
   const totalMultipleChoice = quizData?.questions.filter(q => q.type === 'multiple_choice').length || 0;
 
   return (
-    <div className="flex min-h-dvh font-sans" style={{ backgroundColor: '#17171F' }}>
+    <div className="flex flex-col lg:flex-row min-h-dvh font-sans" style={{ backgroundColor: '#17171F' }}>
       <Sidebar />
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10 relative">
-        <main className="max-w-[800px] mx-auto px-6 sm:px-10 py-10">
+      <div className="flex-1 overflow-y-auto pb-28 lg:pb-10 relative min-w-0">
+        <main className="max-w-[800px] mx-auto px-4 sm:px-10 py-6 sm:py-10">
           <header className="mb-10">
             <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white mb-4 flex items-center gap-2 text-sm transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>

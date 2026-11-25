@@ -39,7 +39,7 @@ export default function LandingPage() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <div className="min-h-dvh flex flex-col font-sans" style={{ backgroundColor: '#13131f', color: '#ffffff' }}>
+    <div className="min-h-dvh flex flex-col font-sans bg-slate-50 dark:bg-[#111318] text-slate-900 dark:text-white transition-colors">
       <Navbar />
 
       {/* ── Hero: 2-col on desktop ── */}
@@ -48,22 +48,17 @@ export default function LandingPage() {
 
           {/* Left */}
           <div className="flex-1 max-w-[480px] animate-slide-up">
-            {/* Label */}
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] mb-4"
-              style={{ color: '#4F46E5' }}>
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] mb-4 text-[#2563EB]">
               A NEW STANDARD
             </p>
 
-            {/* Heading */}
             <h1 id="hero-heading"
-              className="font-display text-[#ffffff] mb-6"
+              className="font-display text-slate-900 dark:text-white mb-6"
               style={{ fontSize: '48px', lineHeight: '1.05', letterSpacing: '-0.02em' }}>
               Elevate your<br />learning journey
             </h1>
 
-            {/* Description */}
-            <p className="text-[14px] leading-[1.6] mb-8"
-              style={{ color: '#d1d5db', maxWidth: '400px' }}>
+            <p className="text-[15px] leading-[1.65] mb-8 text-slate-600 dark:text-gray-300" style={{ maxWidth: '420px' }}>
               Discover a digital space designed with quiet intention. We believe education should inspire clarity, not distraction. Experience a refined methodology tailored for the discerning mind.
             </p>
 
@@ -71,77 +66,87 @@ export default function LandingPage() {
             <div className="flex flex-wrap gap-4">
               <Link
                 to={isAuthenticated ? '/dashboard' : '/register'}
-                className="inline-flex items-center justify-center text-[13px] px-6 py-2.5 rounded-md transition-colors"
-                style={{ backgroundColor: '#5046E5', color: '#ffffff', fontWeight: 500 }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#4338ca'}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = '#5046E5'}
+                className="inline-flex items-center justify-center text-[13px] px-6 py-2.5 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium transition-colors shadow-sm"
               >
                 {isAuthenticated ? 'Dashboard' : 'Get Started'}
               </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center text-[13px] px-6 py-2.5 rounded-md transition-colors"
-                style={{ border: '1px solid rgba(255,255,255,0.1)', color: '#d1d5db', backgroundColor: 'transparent', fontWeight: 500 }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#fff'; }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#d1d5db'; }}
+              <a
+                href="#how-it-works"
+                className="inline-flex items-center justify-center text-[13px] px-6 py-2.5 rounded-lg border border-slate-300 dark:border-white/15 text-slate-700 dark:text-gray-200 hover:bg-slate-200/60 dark:hover:bg-white/5 font-medium transition-colors"
               >
                 Explore Methodology
-              </Link>
+              </a>
             </div>
           </div>
 
-          {/* Right — Tablet image */}
-          <div className="flex-1 w-full max-w-[600px] animate-fade-in flex justify-end">
-             <div className="w-full relative rounded-[16px] overflow-hidden shadow-2xl" style={{ paddingTop: '65%', backgroundColor: '#1a1a2e' }}>
-                <img 
-                  src="/@fs/C:/Users/hp/.gemini/antigravity-ide/brain/637aa257-4162-4df1-8726-fb7e0cd6aa65/app_hero_mockup_1787861450902.jpg" 
-                  alt="Tablet Dashboard" 
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={{ filter: 'contrast(1.05)' }}
-                />
-             </div>
+          {/* Right — Product Preview Card */}
+          <div className="flex-1 w-full max-w-[580px] animate-fade-in flex justify-end">
+            <div className="w-full rounded-2xl overflow-hidden shadow-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1c1e26] p-6">
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200 dark:border-white/10">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-white/20" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-white/20" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-white/20" />
+                </div>
+                <span className="text-[11px] font-mono text-slate-500 dark:text-gray-400">ICS 2408 · Lecture Synthesis</span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#111318] border border-slate-200 dark:border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#2563EB]">Executive Overview</span>
+                  <p className="text-xs sm:text-sm text-slate-700 dark:text-gray-300 mt-1.5 leading-relaxed">
+                    Automatically breaks down 50-slide lecture decks into structured modules, key definitions, and high-yield exam hotspots.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#111318] border border-slate-200 dark:border-white/5">
+                    <p className="text-[10px] font-semibold uppercase text-slate-500 dark:text-gray-400">Flashcards</p>
+                    <p className="text-lg font-display text-slate-900 dark:text-white mt-0.5">SM-2</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#111318] border border-slate-200 dark:border-white/5">
+                    <p className="text-[10px] font-semibold uppercase text-slate-500 dark:text-gray-400">Tutor Modes</p>
+                    <p className="text-lg font-display text-slate-900 dark:text-white mt-0.5">4 Modes</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#111318] border border-slate-200 dark:border-white/5">
+                    <p className="text-[10px] font-semibold uppercase text-slate-500 dark:text-gray-400">Offline</p>
+                    <p className="text-lg font-display text-emerald-600 dark:text-emerald-400 mt-0.5">Ready</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-
       {/* ── Precision in Education (Features) ── */}
-      <section id="features" className="w-full" style={{ backgroundColor: '#13131f', borderTop: '1px solid rgba(255,255,255,0.03)' }} aria-labelledby="precision-heading">
+      <section id="features" className="w-full bg-white dark:bg-[#16181f] border-t border-slate-200 dark:border-white/5" aria-labelledby="precision-heading">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-20">
           <div className="text-center mb-14">
             <h2 id="precision-heading"
-              className="font-display text-[#ffffff] mb-3"
+              className="font-display text-slate-900 dark:text-white mb-3"
               style={{ fontSize: '28px' }}>
               Precision in Education
             </h2>
-            <p className="text-[13px] leading-relaxed mx-auto" style={{ color: '#9ca3af', maxWidth: '520px' }}>
+            <p className="text-[14px] leading-relaxed mx-auto text-slate-600 dark:text-gray-400" style={{ maxWidth: '520px' }}>
               Our architecture is built on three pillars of excellence, designed to foster deep work and
               sustained intellectual growth.
             </p>
           </div>
 
-          {/* 3-column feature cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {FEATURES.map((feature, i) => (
               <div
                 key={feature.id}
-                className="rounded-xl p-8 flex flex-col animate-slide-up hover:-translate-y-1 transition-transform duration-300"
-                style={{
-                  backgroundColor: '#1a1a2e',
-                  border: '1px solid rgba(255,255,255,0.02)',
-                  animationDelay: `${i * 100}ms`,
-                }}
+                className="rounded-xl p-8 flex flex-col animate-slide-up hover:-translate-y-1 transition-transform duration-300 bg-slate-50 dark:bg-[#1c1e26] border border-slate-200 dark:border-white/5"
+                style={{ animationDelay: `${i * 100}ms` }}
               >
-                {/* Icon box */}
-                <div
-                  className="flex items-center justify-center rounded-[8px] mb-5"
-                  style={{ width: 40, height: 40, backgroundColor: '#2d2d4a', color: '#9ca3af' }}
-                >
+                <div className="flex items-center justify-center rounded-lg mb-5 w-10 h-10 bg-blue-50 dark:bg-white/5 text-[#2563EB] dark:text-blue-400">
                   {feature.icon}
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-semibold text-[#ffffff] mb-2">{feature.title}</h3>
-                  <p className="text-[13px] leading-[1.6]" style={{ color: '#9ca3af' }}>{feature.description}</p>
+                  <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white mb-2">{feature.title}</h3>
+                  <p className="text-[13px] leading-[1.6] text-slate-600 dark:text-gray-400">{feature.description}</p>
                 </div>
               </div>
             ))}
@@ -150,47 +155,46 @@ export default function LandingPage() {
       </section>
 
       {/* ── How it Works ── */}
-      <section id="how-it-works" className="w-full" style={{ backgroundColor: '#17171F', borderTop: '1px solid rgba(255,255,255,0.03)' }} aria-labelledby="how-it-works-heading">
+      <section id="how-it-works" className="w-full bg-slate-50 dark:bg-[#111318] border-t border-slate-200 dark:border-white/5" aria-labelledby="how-it-works-heading">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-20">
           <div className="text-center mb-16">
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] mb-3" style={{ color: '#5B57FF' }}>SIMPLIFIED WORKFLOW</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] mb-3 text-[#2563EB]">SIMPLIFIED WORKFLOW</p>
             <h2 id="how-it-works-heading"
-              className="font-display text-[#ffffff] mb-3"
+              className="font-display text-slate-900 dark:text-white mb-3"
               style={{ fontSize: '28px' }}>
               How ElimuPap Works
             </h2>
-            <p className="text-[13px] leading-relaxed mx-auto" style={{ color: '#9ca3af', maxWidth: '520px' }}>
+            <p className="text-[14px] leading-relaxed mx-auto text-slate-600 dark:text-gray-400" style={{ maxWidth: '520px' }}>
               Transform your raw study materials into an actionable, personalized learning plan in just three simple steps.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            {/* Connecting Line (desktop only) */}
-            <div className="hidden md:block absolute top-6 left-[15%] right-[15%] h-px" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}></div>
+            <div className="hidden md:block absolute top-6 left-[15%] right-[15%] h-px bg-slate-200 dark:bg-white/10"></div>
 
             {/* Step 1 */}
             <div className="relative text-center animate-slide-up">
-              <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center font-display text-lg mb-6 relative z-10" style={{ backgroundColor: '#1F1F2A', border: '1px solid #5B57FF', color: '#5B57FF' }}>1</div>
-              <h3 className="text-[16px] font-semibold text-white mb-2">Upload Materials</h3>
-              <p className="text-[13px] leading-[1.6] mx-auto" style={{ color: '#9ca3af', maxWidth: '280px' }}>
+              <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center font-display text-lg mb-6 relative z-10 bg-white dark:bg-[#1c1e26] border border-[#2563EB] text-[#2563EB]">1</div>
+              <h3 className="text-[16px] font-semibold text-slate-900 dark:text-white mb-2">Upload Materials</h3>
+              <p className="text-[13px] leading-[1.6] mx-auto text-slate-600 dark:text-gray-400" style={{ maxWidth: '280px' }}>
                 Easily upload your lecture slides, PDFs, or typed notes directly to your secure digital library.
               </p>
             </div>
 
             {/* Step 2 */}
             <div className="relative text-center animate-slide-up" style={{ animationDelay: '100ms' }}>
-              <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center font-display text-lg mb-6 relative z-10" style={{ backgroundColor: '#1F1F2A', border: '1px solid #5B57FF', color: '#5B57FF' }}>2</div>
-              <h3 className="text-[16px] font-semibold text-white mb-2">AI Processing</h3>
-              <p className="text-[13px] leading-[1.6] mx-auto" style={{ color: '#9ca3af', maxWidth: '280px' }}>
+              <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center font-display text-lg mb-6 relative z-10 bg-white dark:bg-[#1c1e26] border border-[#2563EB] text-[#2563EB]">2</div>
+              <h3 className="text-[16px] font-semibold text-slate-900 dark:text-white mb-2">AI Processing</h3>
+              <p className="text-[13px] leading-[1.6] mx-auto text-slate-600 dark:text-gray-400" style={{ maxWidth: '280px' }}>
                 Our assistant instantly analyzes your files to generate concise summaries, flashcards, and custom quizzes.
               </p>
             </div>
 
             {/* Step 3 */}
             <div className="relative text-center animate-slide-up" style={{ animationDelay: '200ms' }}>
-              <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center font-display text-lg mb-6 relative z-10" style={{ backgroundColor: '#1F1F2A', border: '1px solid #5B57FF', color: '#5B57FF' }}>3</div>
-              <h3 className="text-[16px] font-semibold text-white mb-2">Master the Material</h3>
-              <p className="text-[13px] leading-[1.6] mx-auto" style={{ color: '#9ca3af', maxWidth: '280px' }}>
+              <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center font-display text-lg mb-6 relative z-10 bg-white dark:bg-[#1c1e26] border border-[#2563EB] text-[#2563EB]">3</div>
+              <h3 className="text-[16px] font-semibold text-slate-900 dark:text-white mb-2">Master the Material</h3>
+              <p className="text-[13px] leading-[1.6] mx-auto text-slate-600 dark:text-gray-400" style={{ maxWidth: '280px' }}>
                 Follow your personalized study plan, take quizzes, and track your mastery directly on the dashboard.
               </p>
             </div>
@@ -199,41 +203,37 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA Banner ── */}
-      <section className="w-full" style={{ backgroundColor: '#1a1a2e' }} aria-labelledby="cta-heading">
+      <section className="w-full bg-white dark:bg-[#16181f] border-t border-slate-200 dark:border-white/5" aria-labelledby="cta-heading">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-24 text-center">
           <h2 id="cta-heading"
-            className="font-display text-[#ffffff] mb-4"
+            className="font-display text-slate-900 dark:text-white mb-4"
             style={{ fontSize: '36px', letterSpacing: '-0.01em' }}>
             Begin your journey today
           </h2>
-          <p className="text-[14px] leading-relaxed mb-8 mx-auto" style={{ color: '#9ca3af', maxWidth: '440px' }}>
+          <p className="text-[14px] leading-relaxed mb-8 mx-auto text-slate-600 dark:text-gray-400" style={{ maxWidth: '440px' }}>
             Join a community of professionals committed to purposeful learning. Step into a space
             designed for clarity and focus.
           </p>
           <Link
             to={isAuthenticated ? '/dashboard' : '/register'}
-            className="inline-flex items-center justify-center text-[13px] px-6 py-2.5 rounded-md transition-colors"
-            style={{ backgroundColor: '#5046E5', color: '#ffffff', fontWeight: 500 }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#4338ca'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#5046E5'}
+            className="inline-flex items-center justify-center text-[13px] px-6 py-2.5 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium transition-colors shadow-sm"
           >
             {isAuthenticated ? 'Open Dashboard' : 'Create your account'}
           </Link>
         </div>
       </section>
 
-
       {/* ── Footer ── */}
-      <footer className="w-full" style={{ backgroundColor: '#13131f' }}>
+      <footer className="w-full bg-slate-50 dark:bg-[#111318] border-t border-slate-200 dark:border-white/5">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <span className="font-display text-[#ffffff] text-[20px]">ElimuPap</span>
-          <div className="flex items-center gap-8 text-[10px] uppercase tracking-wider font-semibold" style={{ color: '#9ca3af' }}>
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-white transition-colors">Contact</a>
+          <span className="font-display text-slate-900 dark:text-white text-[20px]">ElimuPap</span>
+          <div className="flex items-center gap-8 text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-gray-400">
+            <a href="#" className="hover:text-slate-900 dark:hover:text-white transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-slate-900 dark:hover:text-white transition-colors">Terms of Service</a>
+            <a href="#" className="hover:text-slate-900 dark:hover:text-white transition-colors">Contact</a>
           </div>
-          <p className="text-[10px] font-semibold" style={{ color: '#6b7280' }}>
-            © 2024 ElimuPap AI. All rights reserved.
+          <p className="text-[10px] font-semibold text-slate-500 dark:text-gray-500">
+            © 2026 ElimuPap AI. All rights reserved.
           </p>
         </div>
       </footer>

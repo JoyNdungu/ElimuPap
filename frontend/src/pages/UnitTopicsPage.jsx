@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import PastPaperBank from '../components/PastPaperBank';
 
 export default function UnitTopicsPage() {
   const { unitCode } = useParams();
@@ -9,6 +10,7 @@ export default function UnitTopicsPage() {
   const [notes, setNotes] = useState([]);
   const [unit, setUnit] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('notes'); // 'notes', 'past_papers', 'graph'
 
   useEffect(() => {
     fetchData();
@@ -25,7 +27,7 @@ export default function UnitTopicsPage() {
       
       const foundUnit = unitsRes.data.find(u => u.unit_code === unitCode);
       if (!foundUnit) {
-        navigate('/notes'); // Redirect if invalid unit
+        navigate('/notes');
         return;
       }
       setUnit(foundUnit);
@@ -42,7 +44,6 @@ export default function UnitTopicsPage() {
     e.stopPropagation();
     if (!window.confirm("Are you sure you want to delete this note?")) return;
     
-    // Optimistic UI update
     const previousNotes = [...notes];
     setNotes(notes.filter(n => n.id !== noteId));
     
@@ -59,13 +60,13 @@ export default function UnitTopicsPage() {
   };
 
   return (
-    <div className="flex min-h-dvh font-sans" style={{ backgroundColor: '#17171F' }}>
+    <div className="flex flex-col lg:flex-row min-h-dvh font-sans" style={{ backgroundColor: '#17171F' }}>
       <Sidebar />
 
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10 relative">
-        <main className="max-w-[1100px] mx-auto px-6 sm:px-10 py-10">
+      <div className="flex-1 overflow-y-auto pb-28 lg:pb-10 relative min-w-0">
+        <main className="max-w-[1100px] mx-auto px-4 sm:px-10 py-6 sm:py-10">
           
-          {/* ── Header ── */}
+          {/* Header */}
           <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-6 mb-8 animate-fade-in">
             <div className="max-w-[600px]">
               <Link to="/notes" className="inline-flex items-center gap-2 text-[13px] font-medium text-[#9ca3af] hover:text-white transition-colors mb-4">
@@ -74,11 +75,11 @@ export default function UnitTopicsPage() {
                 </svg>
                 Back to All Units
               </Link>
-              <h1 className="font-display text-[2.75rem] text-white leading-none mb-2 tracking-tight">
+              <h1 className="font-display text-2xl sm:text-[2.75rem] text-white leading-tight mb-2 tracking-tight">
                 {unit?.unit_name || unitCode}
               </h1>
               <p className="text-[15px] leading-relaxed" style={{ color: '#9ca3af' }}>
-                {unitCode} • Manage notes and topics for this unit.
+                {unitCode} • Manage notes, past papers, and concept graphs for this unit.
               </p>
             </div>
             
@@ -94,6 +95,32 @@ export default function UnitTopicsPage() {
               </Link>
             </div>
           </header>
+
+          {/* Unit Feature Tabs */}
+          <div className="flex bg-[#11111a] border border-[rgba(255,255,255,0.05)] p-1.5 rounded-2xl mb-8 max-w-md">
+            <button
+              onClick={() => setActiveTab('notes')}
+              className={`flex-1 py-2 rounded-xl text-xs font-semibold transition ${
+                activeTab === 'notes' ? 'bg-[#5B57FF] text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Topics & Notes
+            </button>
+            <button
+              onClick={() => setActiveTab('past_papers')}
+              className={`flex-1 py-2 rounded-xl text-xs font-semibold transition ${
+                activeTab === 'past_papers' ? 'bg-[#5B57FF] text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Past Papers Bank
+            </button>
+          </div>
+
+          {activeTab === 'past_papers' && <PastPaperBank />}
+
+          {activeTab === 'notes' && (
+            <>
+
 
           {/* ── Topics Quick List (Table of Contents) ── */}
           {!isLoading && unit?.topics?.length > 0 && (
@@ -201,8 +228,11 @@ export default function UnitTopicsPage() {
 
             </div>
           )}
+          </>
+          )}
 
         </main>
+
       </div>
     </div>
   );

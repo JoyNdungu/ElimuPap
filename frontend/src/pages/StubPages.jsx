@@ -2,9 +2,9 @@ import Sidebar from '../components/Sidebar';
 
 function StubPage({ icon, title, description }) {
   return (
-    <div className="flex min-h-dvh font-sans" style={{ backgroundColor: '#17171F' }}>
+    <div className="flex flex-col lg:flex-row min-h-dvh font-sans" style={{ backgroundColor: '#17171F' }}>
       <Sidebar />
-      <div className="flex-1 pb-24 lg:pb-0 flex items-center justify-center px-6">
+      <div className="flex-1 pb-28 lg:pb-0 flex items-center justify-center px-6 min-w-0">
         <div className="text-center max-w-md animate-slide-up">
           <div className="text-[4rem] mb-8 select-none flex justify-center">
             <div className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl" style={{ backgroundColor: '#1F1F2A', border: '1px solid rgba(255,255,255,0.03)' }}>

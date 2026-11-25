@@ -1,4 +1,11 @@
 import axios from 'axios';
+import {
+  saveCachedResponse,
+  getCachedResponse,
+  isQueueableMutation,
+  enqueueOfflineAction,
+  buildOfflineQuizFromCache,
+} from '../utils/offlineCache';
 
 /**
  * Axios instance pre-configured with the FastAPI base URL.
@@ -30,10 +37,71 @@ api.interceptors.request.use(
 );
 
 // ── Response Interceptor ─────────────────────────────────
-// On 401, clear stored credentials and redirect to /login.
+// 1. Cache successful study data for offline viewing.
+// 2. Fallback to offline cache on network errors.
+// 3. On 401, clear stored credentials and redirect to /login.
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    try {
+      saveCachedResponse(
+        response.config?.method,
+        response.config?.url,
+        response.config?.data,
+        response.data
+      );
+    } catch (_) {
+      // ignore cache write issues
+    }
+    return response;
+  },
   (error) => {
+    // Offline fallback when there is no network response
+    if (!error.response && error.config) {
+      const cached = getCachedResponse(
+        error.config.method,
+        error.config.url,
+        error.config.data
+      );
+      if (cached !== null) {
+        return Promise.resolve({
+          data: cached,
+          status: 200,
+          statusText: 'OK (Offline Cache)',
+          headers: {},
+          config: error.config,
+          fromOfflineCache: true,
+        });
+      }
+
+      // Offline fallback quiz built from cached summary definitions & takeaways
+      if ((error.config.url || '').includes('/ai/quiz')) {
+        const fallbackQuiz = buildOfflineQuizFromCache(error.config.data);
+        if (fallbackQuiz) {
+          return Promise.resolve({
+            data: fallbackQuiz,
+            status: 200,
+            statusText: 'OK (Offline Quiz Fallback)',
+            headers: {},
+            config: error.config,
+            fromOfflineCache: true,
+          });
+        }
+      }
+
+      // Queue study mutations (SRS reviews, study timer, activity logs) to sync when back online
+      if (isQueueableMutation(error.config.method, error.config.url)) {
+        enqueueOfflineAction(error.config.method, error.config.url, error.config.data);
+        return Promise.resolve({
+          data: { queued: true, offline: true },
+          status: 200,
+          statusText: 'Queued (Offline Sync)',
+          headers: {},
+          config: error.config,
+          fromOfflineQueue: true,
+        });
+      }
+    }
+
     if (error.response?.status === 401) {
       // Only clear + redirect if it's not the login/register endpoint itself
       const url = error.config?.url || '';

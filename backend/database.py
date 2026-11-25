@@ -3,9 +3,12 @@ from dotenv import load_dotenv
 import os
 
 # Load the .env file so we can read MONGODB_URL
+from pathlib import Path
+env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=env_path)
 load_dotenv()
 
-MONGODB_URL = os.getenv("MONGODB_URL")
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://127.0.0.1:27017/elimupap")
 
 # Create a connection to MongoDB Atlas with a 5 second timeout
 # so it fails quickly instead of hanging forever if the IP is blocked
@@ -30,6 +33,11 @@ exams_collection = db["exams"]
 units_collection = db["units"]
 focus_areas_collection = db["focus_areas"]
 sessions_collection = db["chat_sessions"]
+
+# New Collections for Roadmap Features
+srs_flashcards_collection = db["srs_flashcards"]
+past_papers_collection = db["past_papers"]
+study_sessions_collection = db["study_sessions"]
 
 # Test the connection when this file is run directly
 if __name__ == "__main__":

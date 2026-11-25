@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import OfflineBanner from './components/OfflineBanner';
 
 import LandingPage      from './pages/LandingPage';
 import LoginPage        from './pages/LoginPage';
@@ -8,6 +10,7 @@ import RegisterPage     from './pages/RegisterPage';
 import DashboardPage    from './pages/DashboardPage';
 import NotesPage        from './pages/NotesPage';
 import NoteViewerPage   from './pages/NoteViewerPage';
+import SummaryPage      from './pages/SummaryPage';
 import TutorPage        from './pages/TutorPage';
 import UploadNotesPage  from './pages/UploadNotesPage';
 import UnitTopicsPage   from './pages/UnitTopicsPage';
@@ -17,9 +20,11 @@ import ProfilePage    from './pages/ProfilePage';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <OfflineBanner />
+          <Routes>
           {/* ── Public routes ── */}
           <Route path="/"         element={<LandingPage />} />
           <Route path="/login"    element={<LoginPage />} />
@@ -59,10 +64,26 @@ export default function App() {
             }
           />
           <Route
+            path="/notes/upload"
+            element={
+              <ProtectedRoute>
+                <UploadNotesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/notes/:noteId"
             element={
               <ProtectedRoute>
                 <NoteViewerPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/summary/:noteId"
+            element={
+              <ProtectedRoute>
+                <SummaryPage />
               </ProtectedRoute>
             }
           />
@@ -102,7 +123,8 @@ export default function App() {
           {/* ── Fallback ── */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

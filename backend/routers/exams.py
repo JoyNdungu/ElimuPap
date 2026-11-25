@@ -4,7 +4,8 @@ from typing import Optional, List
 from database import exams_collection, units_collection, users_collection
 from utils.auth import decode_token
 from bson import ObjectId
-from google import genai
+from openai import OpenAI
+import base64
 import os
 import shutil
 import json
@@ -87,11 +88,14 @@ async def parse_timetable(file: UploadFile = File(...), user_id: str = Depends(g
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        api_key = os.getenv("GEMINI_API_KEY")
-        client = genai.Client(api_key=api_key)
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+        api_key = os.getenv("GROQ_API_KEY") or os.getenv("GROK_API_KEY")
+        client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
         
-        uploaded_file = client.files.upload(file=file_path)
-        
+        with open(file_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            
         prompt = f"""
         Extract exam dates, times, and venues from this timetable image.
         The student is in Year of Study: {year_of_study}.
@@ -106,24 +110,42 @@ async def parse_timetable(file: UploadFile = File(...), user_id: str = Depends(g
         ONLY return exams that belong to the student's registered units. 
         For each match, return the EXACT "unit_code" from the registered units list provided above.
         
-        Return ONLY a JSON array of objects with the following schema:
-        [
-          {{
-            "unit_code": "The exact registered unit code",
-            "exam_date": "YYYY-MM-DD format only",
-            "exam_time": "HH:MM format",
-            "venue": "Room or venue string"
-          }}
-        ]
+        Return ONLY a JSON object with the following schema:
+        {{
+          "exams": [
+            {{
+              "unit_code": "The exact registered unit code",
+              "exam_date": "YYYY-MM-DD format only",
+              "exam_time": "HH:MM format",
+              "venue": "Room or venue string"
+            }}
+          ]
+        }}
         """
         
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=[uploaded_file, prompt],
-            config=genai.types.GenerateContentConfig(response_mime_type="application/json")
+        vision_model = os.getenv("GROQ_VISION_MODEL", "llama-3.2-11b-vision-preview")
+        response = client.chat.completions.create(
+            model=vision_model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=1200
         )
         
-        parsed_exams = json.loads(response.text)
+        parsed_exams_response = json.loads(response.choices[0].message.content)
+        parsed_exams = parsed_exams_response.get("exams", [])
         
         created_exams = []
         for e in parsed_exams:

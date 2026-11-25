@@ -3,14 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="ElimuPap — AI-powered academic assistant for university students. Upload notes, generate summaries, ask questions, take quizzes, and get personalised study plans." />
-    <meta name="theme-color" content="#0d0d1b" />
+    <meta name="theme-color" content="#2563EB" />
     <!-- Fonts from Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
     <title>ElimuPap — AI-Powered Academic Assistant</title>
+    <!-- ⚡ Blocking: apply saved theme before first paint — eliminates FOUC -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('elimupap_theme');
+          if (t === 'light') {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.setAttribute('data-theme', 'light');
+          } else {
+            // Default: dark
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
