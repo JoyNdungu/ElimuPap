@@ -286,7 +286,7 @@ function TutorLeftPanel({
                           onDeleteConversation(conv.id);
                         }}
                         title="Delete conversation"
-                        className={`opacity-0 group-hover:opacity-100 p-1 rounded-md text-[10px] transition ${
+                        className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 p-1.5 rounded-md text-[10px] transition ${
                           isDark ? 'text-gray-400 hover:text-rose-400 hover:bg-white/10' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
                         }`}
                       >
@@ -812,16 +812,19 @@ export default function TutorPage() {
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setPanelOpen(o => !o)}
-              title={panelOpen ? 'Hide notes & history panel' : 'Open notes & history panel'}
-              className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all border ${
+              aria-label={panelOpen ? 'Hide notes and chats menu' : 'Open notes and chats menu'}
+              title={panelOpen ? 'Hide notes & history menu' : 'Open notes & history menu'}
+              className={`flex-shrink-0 px-3 py-2 rounded-xl flex items-center gap-2 text-xs font-semibold transition-all border ${
                 isDark
-                  ? 'bg-white/5 border-white/10 text-gray-300 hover:text-white hover:bg-white/10'
-                  : 'bg-[#f8fafc] border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  ? 'bg-[#2563EB]/20 border-[#2563EB]/40 text-blue-200 hover:bg-[#2563EB]/30 hover:text-white'
+                  : 'bg-blue-50 border-blue-200 text-[#1D4ED8] hover:bg-blue-100'
               }`}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0118 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
               </svg>
+              <span className="whitespace-nowrap lg:hidden">{panelOpen ? 'Hide Menu' : 'Notes & Menu'}</span>
+              <span className="hidden lg:inline whitespace-nowrap">{panelOpen ? 'Hide Panel' : 'Notes & Chats'}</span>
             </button>
 
             <div>

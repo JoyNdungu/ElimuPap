@@ -25,6 +25,8 @@ export default function NotesPage() {
   const [unitCode, setUnitCode] = useState('');
   const [unitName, setUnitName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { type: 'note' | 'unit', id, title, code }
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -81,45 +83,64 @@ export default function NotesPage() {
     }
   };
 
-  const handleDeleteUnit = async (unitId, code) => {
-    if (!window.confirm(`Are you sure you want to delete ${code}?`)) return;
-    
-    const previousUnits = [...units];
-    const previousActive = activeUnitCode;
-    const updatedUnits = units.filter(u => u.id !== unitId);
-    setUnits(updatedUnits);
-    if (activeUnitCode === code) {
-      setActiveUnitCode('ALL');
-    }
-    
-    try {
-      const token = localStorage.getItem('elimupap_token');
-      await api.delete(`/units/${unitId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-    } catch (err) {
-      setUnits(previousUnits);
-      setActiveUnitCode(previousActive);
-      setError('Failed to delete unit.');
-    }
+  const handleDeleteUnit = (unitId, code, name) => {
+    setDeleteTarget({
+      type: 'unit',
+      id: unitId,
+      code,
+      title: name ? `${code} — ${name}` : code,
+    });
   };
 
-  const handleDeleteNote = async (noteId, e) => {
+  const handleDeleteNote = (note, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this recording/note?")) return;
-    
+    setDeleteTarget({
+      type: 'note',
+      id: note.id,
+      title: note.title || 'this note',
+    });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    const token = localStorage.getItem('elimupap_token');
+
+    if (deleteTarget.type === 'unit') {
+      const previousUnits = [...units];
+      const previousActive = activeUnitCode;
+      setUnits(units.filter(u => u.id !== deleteTarget.id));
+      if (activeUnitCode === deleteTarget.code) {
+        setActiveUnitCode('ALL');
+      }
+      try {
+        await api.delete(`/units/${deleteTarget.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setDeleteTarget(null);
+      } catch (err) {
+        setUnits(previousUnits);
+        setActiveUnitCode(previousActive);
+        setError(err?.response?.data?.detail || 'Failed to delete unit.');
+      } finally {
+        setIsDeleting(false);
+      }
+      return;
+    }
+
     const previousNotes = [...notes];
-    setNotes(notes.filter(n => n.id !== noteId));
-    
+    setNotes(notes.filter(n => n.id !== deleteTarget.id));
     try {
-      const token = localStorage.getItem('elimupap_token');
-      await api.delete(`/notes/${noteId}`, {
+      await api.delete(`/notes/${deleteTarget.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      setDeleteTarget(null);
     } catch (err) {
       setNotes(previousNotes);
       setError(err?.response?.data?.detail || 'Failed to delete note.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -458,7 +479,7 @@ export default function NotesPage() {
                   </h2>
                   {activeUnitCode !== 'ALL' && !activeUnitObj.id?.startsWith('virtual_') && (
                     <button
-                      onClick={() => handleDeleteUnit(activeUnitObj.id, activeUnitObj.unit_code)}
+                      onClick={() => handleDeleteUnit(activeUnitObj.id, activeUnitObj.unit_code, activeUnitObj.unit_name)}
                       className={`transition-colors ${isDark ? 'text-gray-500 hover:text-red-400' : 'text-slate-400 hover:text-red-600'}`}
                       title="Delete Unit"
                     >
@@ -614,13 +635,17 @@ export default function NotesPage() {
                           }`}
                         />
 
-                        {/* Delete Button */}
+                        {/* Delete Button (always visible on mobile & desktop) */}
                         <button
-                          onClick={(e) => handleDeleteNote(note.id, e)}
-                          className={`absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all z-10 ${
-                            isDark ? 'text-rose-400 hover:bg-rose-400/10' : 'text-rose-600 hover:bg-rose-50'
+                          type="button"
+                          onClick={(e) => handleDeleteNote(note, e)}
+                          aria-label={`Delete ${note.title || 'note'}`}
+                          className={`absolute top-3 right-3 p-2 rounded-xl opacity-100 lg:opacity-75 lg:group-hover:opacity-100 transition-all z-10 border ${
+                            isDark
+                              ? 'text-rose-400 bg-rose-500/10 border-rose-500/20 hover:bg-rose-500/20'
+                              : 'text-rose-600 bg-rose-50 border-rose-200 hover:bg-rose-100'
                           }`}
-                          title="Delete"
+                          title="Delete note"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -652,7 +677,7 @@ export default function NotesPage() {
                           </div>
 
                           {/* Info */}
-                          <div className="flex-1 min-w-0 pr-6">
+                          <div className="flex-1 min-w-0 pr-10">
                             <div className="flex items-center gap-2 mb-1">
                               {isAudio ? (
                                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 ${
@@ -736,6 +761,65 @@ export default function NotesPage() {
           fetchData();
         }}
       />
+
+      {/* Delete Confirmation Alert Modal */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-fade-in"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
+          onClick={() => !isDeleting && setDeleteTarget(null)}
+        >
+          <div
+            className={`w-full max-w-sm rounded-2xl p-6 shadow-2xl border animate-slide-up ${
+              isDark ? 'bg-[#1F1F2A] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3.5 mb-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border ${
+                isDark ? 'bg-rose-500/15 border-rose-500/30 text-rose-400' : 'bg-rose-50 border-rose-200 text-rose-600'
+              }`}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h3 id="delete-confirm-title" className="text-base font-bold leading-snug">
+                  {deleteTarget.type === 'unit' ? 'Delete Unit?' : 'Delete Note?'}
+                </h3>
+                <p className={`text-xs mt-1 leading-relaxed ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>
+                  Are you sure you want to delete <span className="font-semibold">&ldquo;{deleteTarget.title}&rdquo;</span>? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeleteTarget(null)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition disabled:opacity-50 ${
+                  isDark
+                    ? 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
+                    : 'bg-[#f8fafc] border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDelete}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition disabled:opacity-60"
+              >
+                {isDeleting ? 'Deleting…' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
