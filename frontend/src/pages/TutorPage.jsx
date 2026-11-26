@@ -847,30 +847,8 @@ export default function TutorPage() {
             </div>
           </div>
 
-          {/* Mode Selector & Chat Controls */}
+          {/* Chat Controls */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            {[
-              { id: 'tutor', label: '⚡ Master Tutor', desc: 'Balanced & interactive' },
-              { id: 'exam_drill', label: '🎯 Exam Drill', desc: 'Past-paper & marking scheme' },
-              { id: 'simple_analogy', label: '💡 Analogies', desc: 'Relatable everyday examples' },
-              { id: 'quiz', label: '🎮 Pop Quiz', desc: 'Turn-by-turn trivia challenge' },
-            ].map(mode => (
-              <button
-                key={mode.id}
-                onClick={() => setTutorMode(mode.id)}
-                title={mode.desc}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 border ${
-                  tutorMode === mode.id
-                    ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-sm scale-[1.02]'
-                    : isDark
-                    ? 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-gray-200'
-                    : 'bg-[#f8fafc] text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <span>{mode.label}</span>
-              </button>
-            ))}
-
             <button
               onClick={() => {
                 setLeftTab('history');
@@ -884,7 +862,7 @@ export default function TutorPage() {
               }`}
             >
               <span>💬</span>
-              <span className="hidden sm:inline">History</span>
+              <span>History</span>
               {conversations.length > 0 && (
                 <span className="text-[10px] font-mono opacity-80">({conversations.length})</span>
               )}
