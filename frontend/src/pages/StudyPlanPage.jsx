@@ -89,7 +89,7 @@ export default function StudyPlanPage() {
       const formData = new FormData();
       formData.append('file', timetableFile);
       const token = localStorage.getItem('elimupap_token');
-      await api.post('/exams/parse', formData, {
+      const res = await api.post('/exams/parse', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`
@@ -97,7 +97,7 @@ export default function StudyPlanPage() {
       });
       setTimetableFile(null);
       fetchExams();
-      alert('Timetable parsed and exams added!');
+      alert(res?.data?.message || 'Timetable parsed and exams added!');
     } catch (err) {
       setError(err?.response?.data?.detail || 'Failed to parse timetable');
     } finally {
@@ -221,7 +221,7 @@ export default function StudyPlanPage() {
                       className="w-full px-4 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#5B57FF]"
                       style={{ backgroundColor: '#11111a', border: '1px solid #2d2d4a' }} required>
                       <option value="">Select Unit...</option>
-                      {units.map(u => <option key={u.id} value={u.unit_code}>{u.unit_code} - {u.title}</option>)}
+                      {units.map(u => <option key={u.id} value={u.unit_code}>{u.unit_code} - {u.unit_name || u.title}</option>)}
                     </select>
                     <input type="date" value={manualExam.exam_date} onChange={e => setManualExam({ ...manualExam, exam_date: e.target.value })}
                       className="w-full px-4 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#5B57FF]"

@@ -91,7 +91,13 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 DEFAULT_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
-VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "llama-3.2-11b-vision-preview")
+_DEPRECATED_VISION_MODELS = {"llama-3.2-11b-vision-preview", "llama-3.2-90b-vision-preview"}
+_raw_vision_model = (os.getenv("GROQ_VISION_MODEL") or "").strip()
+VISION_MODEL = (
+    "meta-llama/llama-4-scout-17b-16e-instruct"
+    if not _raw_vision_model or _raw_vision_model in _DEPRECATED_VISION_MODELS
+    else _raw_vision_model
+)
 
 # Initialize Grok and OpenAI Clients
 def get_grok_client():
