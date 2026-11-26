@@ -495,7 +495,7 @@ export default function NotesPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => setAudioModalOpen(true)}
-                  className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border shadow-sm ${
+                  className={`hidden lg:inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border shadow-sm ${
                     isDark
                       ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30'
                       : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
