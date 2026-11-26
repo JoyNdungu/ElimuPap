@@ -624,8 +624,9 @@ export default function TutorPage() {
       const token = localStorage.getItem('elimupap_token');
       const messagesForApi = updatedWithUser.map(m => ({ role: m.role, content: m.content }));
 
+      const baseUrl = (api.defaults.baseURL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/ai/tutor`,
+        `${baseUrl}/ai/tutor`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -637,7 +638,16 @@ export default function TutorPage() {
         }
       );
 
-      if (!response.ok) throw new Error('Network response error');
+      if (!response.ok) {
+        let serverDetail = '';
+        try {
+          const errData = await response.json();
+          serverDetail = errData?.detail || '';
+        } catch {
+          // ignore non-JSON error body
+        }
+        throw new Error(serverDetail || `HTTP ${response.status}`);
+      }
       setIsTyping(false);
 
       const aiMsgId = (Date.now() + 1).toString();
@@ -659,11 +669,15 @@ export default function TutorPage() {
 
       const finalMessages = [...updatedWithUser, { id: aiMsgId, role: 'assistant', content: aiContent }];
       await persistConversation(convId, finalMessages, activeNote, tutorMode, { syncRemote: true });
-    } catch {
+    } catch (err) {
+      const detail = err?.message || '';
+      const isHttpDetail = detail && !/failed to fetch|load failed|networkerror|network request failed/i.test(detail);
       const errMsg = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: '⚠️ I had a temporary issue connecting with the study server. Please check your network or try again in a moment!'
+        content: isHttpDetail
+          ? `⚠️ Study server error: ${detail}`
+          : '⚠️ I had a temporary issue connecting with the study server. Please check your network or try again in a moment!'
       };
       const finalMessages = [...updatedWithUser, errMsg];
       setMessages(finalMessages);

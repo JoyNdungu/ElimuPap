@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { getOfflineFileUrl, FILES_CACHE_NAME } from '../utils/offlineSync';
 import api from '../api/axios';
 
-const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
 
 // ── Mammoth DOCX renderer ────────────────────────────────────────────────────
 function DocxViewer({ fileUrl }) {

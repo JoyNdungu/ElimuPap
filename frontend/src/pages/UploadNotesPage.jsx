@@ -47,9 +47,9 @@ export default function UploadNotesPage() {
   const addFiles = (incoming) => {
     const valid = Array.from(incoming).filter(isValidFile);
     const invalid = Array.from(incoming).filter(f => !isValidFile(f));
-    
+
     const hasLegacy = invalid.some(f => /\.(doc|ppt)$/i.test(f.name));
-    
+
     if (hasLegacy) {
       setError(`Legacy formats (.doc, .ppt) are too old to be read by our AI. Please open them and "Save As" .docx, .pptx, or .pdf!`);
     } else if (invalid.length) {
@@ -237,8 +237,8 @@ export default function UploadNotesPage() {
                         {/* Uploading spinner */}
                         {isUploading && !result && (
                           <svg className="w-4 h-4 animate-spin text-[#2563EB]" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                           </svg>
                         )}
                         {/* Remove button (when not uploading) */}
@@ -265,9 +265,8 @@ export default function UploadNotesPage() {
               <select
                 value={selectedUnit}
                 onChange={e => setSelectedUnit(e.target.value)}
-                className={`w-full px-4 py-2.5 rounded-lg text-sm border focus:outline-none focus:ring-1 focus:ring-[#2563EB] ${
-                  isDark ? 'bg-[#11111a] border-[#2d2d4a] text-white' : 'bg-white border-slate-200 text-slate-900'
-                }`}
+                className={`w-full px-4 py-2.5 rounded-lg text-sm border focus:outline-none focus:ring-1 focus:ring-[#2563EB] ${isDark ? 'bg-[#11111a] border-[#2d2d4a] text-white' : 'bg-white border-slate-200 text-slate-900'
+                  }`}
               >
                 <option value="">-- No unit selected --</option>
                 {units.map(u => (
@@ -276,18 +275,17 @@ export default function UploadNotesPage() {
               </select>
               {units.length === 0 && (
                 <p className={`text-[11px] mt-2 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                  No units registered yet. <a href="/units" className="underline font-semibold">Add a unit first</a> to organise your notes.
+                  No units registered yet. <a href="/notes" className="underline font-semibold">Add a unit first</a> to organise your notes.
                 </p>
               )}
             </div>
 
             {/* ── Upload result summary ── */}
             {allDone && (
-              <div className={`p-4 rounded-xl text-sm flex items-center gap-3 border ${
-                failCount === 0
+              <div className={`p-4 rounded-xl text-sm flex items-center gap-3 border ${failCount === 0
                   ? (isDark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-700')
                   : (isDark ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-700')
-              }`}>
+                }`}>
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   {failCount === 0
                     ? <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -310,8 +308,8 @@ export default function UploadNotesPage() {
               {isUploading ? (
                 <>
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
                   Uploading {files.length} file{files.length > 1 ? 's' : ''}…
                 </>

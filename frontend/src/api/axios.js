@@ -13,8 +13,11 @@ import {
  *  - Attach Authorization header on outgoing requests (for future protected endpoints).
  *  - Redirect to /login on 401 Unauthorized responses.
  */
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const cleanBaseUrl = rawBaseUrl.replace(/\/+$/, '');
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  baseURL: cleanBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },

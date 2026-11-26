@@ -3,7 +3,7 @@ import { saveCachedResponse, flushOfflineQueue } from './offlineCache';
 
 export const FILES_CACHE_NAME = 'elimupap-files-v1';
 const META_KEY = 'elimupap_offline_meta';
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
 
 export function getOfflineMeta() {
   try {
