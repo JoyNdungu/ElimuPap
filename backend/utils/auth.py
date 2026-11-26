@@ -11,7 +11,10 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "elimupap_secret_key_2026")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or 1440)
+try:
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or 1440)
+except (ValueError, TypeError):
+    ACCESS_TOKEN_EXPIRE_MINUTES = 1440
 
 def hash_password(password: str) -> str:
     """Convert plain password into secure hash"""
