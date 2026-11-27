@@ -182,7 +182,7 @@ export default function RegisterPage() {
                 id="reg-uni"
                 name="university"
                 type="text"
-                placeholder="Dedan Kimathi University"
+                placeholder="Dedan Kimathi University of Technology"
                 className={`w-full pl-10 pr-4 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:border-transparent transition-shadow ${errors.university ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#5B57FF]'}`}
                 style={{ backgroundColor: '#11111a', border: `1px solid ${errors.university ? '#ef4444' : '#2d2d4a'}` }}
                 value={fields.university}
