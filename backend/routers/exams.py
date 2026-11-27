@@ -51,7 +51,7 @@ def extract_timetable_text(file_path: str, ext: str) -> str:
     return ""
 
 
-def condense_timetable_text(text: str, units_info: list, max_chars: int = 8000) -> str:
+def condense_timetable_text(text: str, units_info: list, max_chars: int = 12000) -> str:
     """Keep full text when short, or prioritize lines/context matching the student's registered units."""
     if len(text) <= max_chars:
         return text
@@ -72,20 +72,22 @@ def condense_timetable_text(text: str, units_info: list, max_chars: int = 8000) 
     date_pattern = re.compile(r"\b(mon|tue|wed|thu|fri|sat|sun|202\d|\d{1,2}[/-]\d{1,2})\b", re.I)
 
     for idx, line in enumerate(lines):
-        norm_line = re.sub(r"[^A-Z0-9]", "", line.upper())
-        low_line = line.lower()
+        # Include next line in case PDF extraction split "ICS" and "2101" across two lines
+        paired_line = f"{line} {lines[idx + 1] if idx + 1 < len(lines) else ''}"
+        norm_line = re.sub(r"[^A-Z0-9]", "", paired_line.upper())
+        low_line = paired_line.lower()
         code_hit = any(code and code in norm_line for code in normalized_codes)
         title_hit = any(w in low_line for w in title_words)
         if code_hit or title_hit:
             # Include surrounding lines so date/time/venue headers remain attached
-            for offset in range(-4, 5):
+            for offset in range(-5, 6):
                 j = idx + offset
                 if 0 <= j < len(lines):
                     keep_indices.add(j)
 
     if keep_indices:
         # Also include top lines (document header / semester / year info)
-        for j in range(min(10, len(lines))):
+        for j in range(min(15, len(lines))):
             keep_indices.add(j)
         selected = "\n".join(lines[i] for i in sorted(keep_indices))
         if len(selected) <= max_chars:
@@ -96,6 +98,66 @@ def condense_timetable_text(text: str, units_info: list, max_chars: int = 8000) 
     date_lines = [l for l in lines if date_pattern.search(l)]
     combined = "\n".join(date_lines) if date_lines else text
     return combined[:max_chars]
+
+
+def _normalize_exam_date(raw_date: Optional[str]) -> Optional[str]:
+    """Normalize common timetable date strings to YYYY-MM-DD when possible."""
+    val = (raw_date or "").strip()
+    if not val:
+        return None
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", val):
+        return val
+    from datetime import datetime
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d %b %Y", "%d %B %Y", "%d.%m.%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(val, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return val
+
+
+def _match_registered_unit(extracted: dict, unit_codes: list, units_info: list, normalized_lookup: dict) -> Optional[str]:
+    """Match an extracted timetable exam entry against registered units by code OR unit name."""
+    raw_code = (extracted.get("unit_code") or "").strip()
+    raw_name = (extracted.get("unit_name") or "").strip()
+
+    if raw_code in unit_codes:
+        return raw_code
+
+    norm_code = re.sub(r"[^A-Z0-9]", "", raw_code.upper())
+    if norm_code in normalized_lookup:
+        return normalized_lookup[norm_code]
+
+    # Match when timetable combines code + title or cross-listed codes (e.g., "ICS 2101 / BIT 2101")
+    for reg_norm, reg_code in normalized_lookup.items():
+        if len(reg_norm) >= 4 and reg_norm in norm_code:
+            return reg_code
+
+    # Fall back to matching by unit_name (useful when timetable only shows course title or code had an OCR typo)
+    candidate_text = f"{raw_name} {raw_code}".lower()
+    cand_words = {
+        w for w in re.findall(r"[a-z]{3,}", candidate_text)
+        if w not in {"introduction", "fundamentals", "principles", "unit", "course", "exam", "paper"}
+    }
+    best_code = None
+    best_score = 0.0
+    for u in units_info:
+        u_name = (u.get("unit_name") or "").strip().lower()
+        if not u_name:
+            continue
+        if u_name == raw_name.lower() or (len(u_name) >= 5 and u_name in candidate_text):
+            return u["unit_code"]
+        u_words = {
+            w for w in re.findall(r"[a-z]{3,}", u_name)
+            if w not in {"introduction", "fundamentals", "principles", "unit", "course"}
+        }
+        if u_words and cand_words:
+            overlap = len(u_words & cand_words) / len(u_words)
+            if overlap >= 0.6 and overlap > best_score:
+                best_score = overlap
+                best_code = u["unit_code"]
+
+    return best_code
 
 
 class ExamCreate(BaseModel):
@@ -197,26 +259,25 @@ async def parse_timetable(file: UploadFile = File(...), user_id: str = Depends(g
         client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1", timeout=30.0)
 
         prompt = f"""
-        Extract exam dates, times, and venues from this timetable.
-        The student is in Year of Study: {year_of_study}.
-        The student is registered for these specific units:
+        Extract exam dates, times, and venues from this timetable for the student's registered units below.
+        Student Year of Study (helpful context when sections are grouped by class/year): {year_of_study}.
+        Student's Registered Units:
         {json.dumps(units_info, indent=2)}
 
-        You should extract an exam if it matches ANY of the following criteria:
-        1. The unit code on the timetable matches one of the student's registered unit codes (even if spacing differs, e.g. ICS2101 vs ICS 2101).
-        2. The unit name on the timetable matches or closely resembles one of the student's registered unit_name values.
-        3. The exam is grouped under the student's Year of Study (e.g., Year {year_of_study} or {year_of_study}.1 or similar notation).
+        Matching rules:
+        1. Match primarily by **unit_code** (ignore spaces, dashes, or slashes, e.g. ICS2101, ICS 2101, ICS-2101).
+        2. Also match by **unit_name** (course title), even if abbreviated or formatted differently on the timetable.
+        3. Use Year of Study ({year_of_study}) only as context to locate the right section if the timetable groups papers by year/class.
+        4. For every matched unit, copy the EXACT registered "unit_code" and "unit_name" from the Registered Units list above.
 
-        ONLY return exams that belong to the student's registered units.
-        For each match, return the EXACT "unit_code" from the registered units list provided above.
-
-        Return ONLY a JSON object with the following schema:
+        Return ONLY a JSON object with this schema:
         {{
           "exams": [
             {{
-              "unit_code": "The exact registered unit code",
-              "exam_date": "YYYY-MM-DD format only",
-              "exam_time": "HH:MM format",
+              "unit_code": "Exact registered unit_code",
+              "unit_name": "Unit title seen on timetable or registered unit_name",
+              "exam_date": "YYYY-MM-DD",
+              "exam_time": "HH:MM",
               "venue": "Room or venue string"
             }}
           ]
@@ -288,19 +349,14 @@ async def parse_timetable(file: UploadFile = File(...), user_id: str = Depends(g
 
         created_exams = []
         for e in parsed_exams:
-            raw_code = (e.get("unit_code") or "").strip()
-            matched_code = None
-            if raw_code in unit_codes:
-                matched_code = raw_code
-            else:
-                norm = re.sub(r"[^A-Z0-9]", "", raw_code.upper())
-                matched_code = normalized_lookup.get(norm)
+            matched_code = _match_registered_unit(e, unit_codes, units_info, normalized_lookup)
+            clean_date = _normalize_exam_date(e.get("exam_date"))
 
-            if matched_code and e.get("exam_date"):
+            if matched_code and clean_date:
                 exam_doc = {
                     "user_id": ObjectId(user_id),
                     "unit_code": matched_code,
-                    "exam_date": e.get("exam_date"),
+                    "exam_date": clean_date,
                     "exam_time": e.get("exam_time"),
                     "venue": e.get("venue"),
                 }
@@ -312,9 +368,19 @@ async def parse_timetable(file: UploadFile = File(...), user_id: str = Depends(g
                 created_exams.append(exam_doc)
 
         if not created_exams:
+            reg_preview = ", ".join(unit_codes[:5])
+            seen_preview = ", ".join(
+                (e.get("unit_code") or e.get("unit_name") or "").strip()
+                for e in parsed_exams[:4]
+                if (e.get("unit_code") or e.get("unit_name"))
+            )
+            extra = f" Detected on timetable: {seen_preview}." if seen_preview else ""
             return {
                 "count": 0,
-                "message": "Timetable read successfully, but none of your registered unit codes matched exams in this file. Check that your unit codes match the timetable or add them manually.",
+                "message": (
+                    f"Timetable read successfully, but none matched your registered units ({reg_preview})."
+                    f"{extra} Make sure your Unit Codes or Unit Names match the timetable, or add them manually."
+                ),
             }
 
         return {

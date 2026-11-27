@@ -15,6 +15,9 @@ export default function StudyPlanPage() {
 
   // Planner state
   const [hoursPerDay, setHoursPerDay] = useState(3);
+  const [customTopics, setCustomTopics] = useState('');
+  const [targetDate, setTargetDate] = useState('');
+  const [planWeeks, setPlanWeeks] = useState(4);
   const [plan, setPlan] = useState(null);
 
   useEffect(() => {
@@ -112,6 +115,13 @@ export default function StudyPlanPage() {
     try {
       const formData = new FormData();
       formData.append('hours_per_day', hoursPerDay);
+      formData.append('weeks', planWeeks);
+      if (customTopics.trim()) {
+        formData.append('topics', customTopics.trim());
+      }
+      if (targetDate) {
+        formData.append('target_date', targetDate);
+      }
       const token = localStorage.getItem('elimupap_token');
       const res = await api.post('/ai/study-plan', formData, {
         headers: {
@@ -120,8 +130,9 @@ export default function StudyPlanPage() {
         }
       });
       setPlan(res.data);
+      window.dispatchEvent(new CustomEvent('elimupap:data-changed'));
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to generate study plan. Have you added your exams?');
+      setError(err?.response?.data?.detail || 'Failed to generate study plan. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -279,21 +290,50 @@ export default function StudyPlanPage() {
           {activeTab === 'planner' && (
             <div className="animate-slide-up space-y-6">
 
-              <div className="p-6 rounded-2xl flex flex-col sm:flex-row gap-4 items-center justify-between" style={{ backgroundColor: '#1F1F2A', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="p-6 rounded-2xl space-y-5" style={{ backgroundColor: '#1F1F2A', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div>
                   <h2 className="text-white font-semibold mb-1">Generate Adaptive Plan</h2>
-                  <p className="text-sm text-gray-400">Uses your current mastery scores and upcoming exam dates.</p>
+                  <p className="text-sm text-gray-400">
+                    Works with your uploaded notes, registered units, and exam dates — or simply type topics below to generate a plan with no notes uploaded.
+                  </p>
                 </div>
-                <form onSubmit={handleGeneratePlan} className="flex gap-4 items-center">
-                  <div className="flex flex-col">
-                    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1">Hours/Day</label>
-                    <input type="number" min="1" max="12" value={hoursPerDay} onChange={e => setHoursPerDay(e.target.value)}
-                      className="w-20 px-3 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#5B57FF]"
-                      style={{ backgroundColor: '#11111a', border: '1px solid #2d2d4a' }} />
+                <form onSubmit={handleGeneratePlan} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1.5">
+                      Units or Topics to Focus On (optional — no notes needed)
+                    </label>
+                    <input
+                      type="text"
+                      value={customTopics}
+                      onChange={e => setCustomTopics(e.target.value)}
+                      placeholder="e.g. Data Structures, Database Systems, Calculus II (leave blank to use your registered units/notes)"
+                      className="w-full px-3.5 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#5B57FF]"
+                      style={{ backgroundColor: '#11111a', border: '1px solid #2d2d4a' }}
+                    />
                   </div>
-                  <button type="submit" disabled={loading} className="px-6 py-2 rounded-lg text-white font-medium bg-[#5B57FF] disabled:opacity-50 mt-4">
-                    {loading ? 'Generating...' : 'Regenerate Plan'}
-                  </button>
+                  <div className="flex flex-wrap gap-4 items-end">
+                    <div className="flex flex-col">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1">Hours/Day</label>
+                      <input type="number" min="1" max="12" value={hoursPerDay} onChange={e => setHoursPerDay(e.target.value)}
+                        className="w-24 px-3 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#5B57FF]"
+                        style={{ backgroundColor: '#11111a', border: '1px solid #2d2d4a' }} />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1">Weeks</label>
+                      <input type="number" min="1" max="12" value={planWeeks} onChange={e => setPlanWeeks(e.target.value)}
+                        className="w-24 px-3 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#5B57FF]"
+                        style={{ backgroundColor: '#11111a', border: '1px solid #2d2d4a' }} />
+                    </div>
+                    <div className="flex flex-col flex-1 min-w-[160px]">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1">Target Date (optional)</label>
+                      <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#5B57FF]"
+                        style={{ backgroundColor: '#11111a', border: '1px solid #2d2d4a', colorScheme: 'dark' }} />
+                    </div>
+                    <button type="submit" disabled={loading} className="px-6 py-2.5 rounded-lg text-white font-medium bg-[#5B57FF] hover:bg-[#4c48e8] transition-colors disabled:opacity-50">
+                      {loading ? 'Generating...' : (plan ? 'Regenerate Plan' : 'Generate Plan')}
+                    </button>
+                  </div>
                 </form>
               </div>
 

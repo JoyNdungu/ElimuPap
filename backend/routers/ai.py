@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from database import (
-    notes_collection, summaries_collection, tutor_conversations_collection,
+    users_collection, notes_collection, summaries_collection, tutor_conversations_collection,
     exams_collection, study_plans_collection, units_collection,
     srs_flashcards_collection, past_papers_collection, study_sessions_collection, db
 )
@@ -826,112 +826,160 @@ async def generate_mindmap(req: GenerateRequest, user_id: str = Depends(get_curr
 @router.post("/study-plan")
 async def generate_study_plan(
     hours_per_day: int = Form(3),
+    topics: Optional[str] = Form(""),
+    target_date: Optional[str] = Form(""),
+    weeks: int = Form(4),
     authorization: str = Depends(oauth2_scheme)
 ):
-    """Generate an adaptive AI study plan based on telemetry and exams."""
+    """Generate an adaptive AI study plan using exams, registered units, custom topics, telemetry, and/or notes (notes are optional)."""
     user_id = get_current_user_id(authorization)
     client = get_grok_client()
-    user_obj_id = ObjectId(user_id)
+    user_obj_id = ObjectId(user_id) if ObjectId.is_valid(user_id) else None
+    user_query = {"$or": [{"user_id": user_obj_id}, {"user_id": user_id}]} if user_obj_id else {"user_id": user_id}
+
+    # 0. Fetch student profile & registered units (works even with zero uploaded notes!)
+    user_doc = users_collection.find_one({"_id": user_obj_id}) if user_obj_id else None
+    course_name = (user_doc.get("course") or "").strip() if user_doc else ""
+    year_of_study = (user_doc.get("year_of_study") or "").strip() if user_doc else ""
+    registered_units = list(units_collection.find(user_query))
 
     # 1. Fetch Exams and filter out past exams
-    all_exams = list(exams_collection.find({"user_id": user_obj_id}))
+    all_exams = list(exams_collection.find(user_query))
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    
-    exams = [e for e in all_exams if e.get('exam_date') and e.get('exam_date') >= today_str]
-    
+
+    exams = sorted(
+        [e for e in all_exams if e.get("exam_date") and e.get("exam_date") >= today_str],
+        key=lambda e: e.get("exam_date", "")
+    )
+    clean_target_date = (target_date or "").strip()
+    earliest_exam_label = (
+        exams[0]["exam_date"] if exams else (clean_target_date or "Self-paced")
+    )
+
     if not exams:
-        exam_context = "STUDENT UPCOMING EXAMS:\nNone. The student has no upcoming exams, but wants to build mastery over their registered units."
+        if clean_target_date:
+            exam_context = f"STUDENT TARGET DATE:\n- Target completion / exam date: {clean_target_date}"
+        else:
+            exam_context = "STUDENT UPCOMING EXAMS:\nNone scheduled yet. Build a structured mastery schedule."
     else:
         exam_context = "STUDENT UPCOMING EXAMS:\n"
         for e in exams:
             exam_context += f"- Unit: {e.get('unit_code')}, Date: {e.get('exam_date')}\n"
 
-    # 2. Fetch Notes per Unit
-    notes = list(notes_collection.find({"user_id": user_obj_id}, {"title": 1, "unit_code": 1, "topic": 1}))
+    # 2. Registered units & custom topics
+    units_context = "REGISTERED UNITS:\n"
+    if registered_units:
+        for u in registered_units:
+            uc = u.get("unit_code", "")
+            un = u.get("unit_name") or u.get("title") or ""
+            u_topics = ", ".join(u.get("topics") or []) if isinstance(u.get("topics"), list) else (u.get("topics") or "")
+            units_context += f"- {uc}{f' ({un})' if un else ''}{f' — Topics: {u_topics}' if u_topics else ''}\n"
+    else:
+        units_context += "None registered yet.\n"
+
+    clean_topics = (topics or "").strip()
+    custom_topics_context = (
+        f"STUDENT REQUESTED FOCUS TOPICS / SUBJECTS:\n{clean_topics}\n"
+        if clean_topics
+        else ""
+    )
+    profile_context = (
+        f"STUDENT ACADEMIC PROFILE: Course: {course_name or 'University Student'}"
+        f"{f', Year: {year_of_study}' if year_of_study else ''}\n"
+    )
+
+    # 3. Fetch Notes per Unit (optional — no notes required!)
+    notes = list(notes_collection.find(user_query, {"title": 1, "unit_code": 1, "topic": 1}))
     notes_by_unit = {}
     for n in notes:
-        uc = n.get('unit_code', 'Unknown')
-        if uc not in notes_by_unit:
-            notes_by_unit[uc] = []
-        notes_by_unit[uc].append(n.get('title', 'Untitled'))
+        uc = n.get("unit_code", "General")
+        notes_by_unit.setdefault(uc, []).append(n.get("title", "Untitled"))
 
-    # 3. Calculate Telemetry (Mastery) per Unit
+    # 4. Calculate Telemetry (Mastery) per Unit (always run even if exams list is empty)
     activity_collection = db["activity_logs"]
+    all_logs = list(activity_collection.find(user_query))
+    note_to_unit = {str(n["_id"]): n.get("unit_code") for n in notes}
     unit_stats = {}
-    
-    # We want to gather stats for units that have exams
     for e in exams:
         uc = e.get("unit_code")
-        if uc not in unit_stats:
+        if uc and uc not in unit_stats:
             unit_stats[uc] = {"time_spent": 0, "quizzes": 0, "flashcards": 0}
-            
-        logs = list(activity_collection.find({"user_id": user_obj_id, "unit_code": uc}))
-        # Wait, activity logs might just have note_id. Let's find unit_code from notes.
-        
-        # A more robust way: find all logs for the user, map note_id to unit_code
-        all_logs = list(activity_collection.find({"user_id": user_obj_id}))
-        note_to_unit = {str(n["_id"]): n.get("unit_code") for n in notes}
-        
-        # Reset and recalculate globally
-        unit_stats = {}
-        for log in all_logs:
-            # Figure out unit_code
-            log_uc = log.get("unit_code")
-            if not log_uc and log.get("note_id"):
-                log_uc = note_to_unit.get(str(log["note_id"]))
-            
-            if log_uc:
-                if log_uc not in unit_stats:
-                    unit_stats[log_uc] = {"time_spent": 0, "quizzes": 0, "flashcards": 0}
-                
-                if log["type"] == "time_spent":
-                    unit_stats[log_uc]["time_spent"] += log.get("duration_minutes", 0)
-                elif log["type"] == "quiz_completed":
-                    unit_stats[log_uc]["quizzes"] += 1
-                elif log["type"] == "flashcards_reviewed":
-                    unit_stats[log_uc]["flashcards"] += 1
+    for u in registered_units:
+        uc = u.get("unit_code")
+        if uc and uc not in unit_stats:
+            unit_stats[uc] = {"time_spent": 0, "quizzes": 0, "flashcards": 0}
+
+    for log in all_logs:
+        log_uc = log.get("unit_code")
+        if not log_uc and log.get("note_id"):
+            log_uc = note_to_unit.get(str(log["note_id"]))
+        if log_uc:
+            unit_stats.setdefault(log_uc, {"time_spent": 0, "quizzes": 0, "flashcards": 0})
+            if log.get("type") == "time_spent":
+                unit_stats[log_uc]["time_spent"] += log.get("duration_minutes", 0)
+            elif log.get("type") == "quiz_completed":
+                unit_stats[log_uc]["quizzes"] += 1
+            elif log.get("type") == "flashcards_reviewed":
+                unit_stats[log_uc]["flashcards"] += 1
 
     mastery_context = "STUDENT TELEMETRY / MASTERY (Higher time/quizzes = Better mastery):\n"
-    for uc, stats in unit_stats.items():
-        mastery_context += f"- Unit: {uc}: {stats['time_spent']} mins studied, {stats['quizzes']} quizzes taken, {stats['flashcards']} flashcard decks reviewed.\n"
-    
-    materials_context = "STUDY MATERIALS AVAILABLE:\n"
-    for uc, titles in notes_by_unit.items():
-        materials_context += f"- Unit {uc}: {', '.join(titles)}\n"
-
-    if not exams:
-        objective = f"Generate a highly realistic, 4-week study plan starting from TODAY ({today_str}) to build mastery across all units.\nCrucially, you MUST prioritize units with LOW mastery (low time spent, few quizzes)."
+    if unit_stats:
+        for uc, stats in unit_stats.items():
+            mastery_context += f"- Unit: {uc}: {stats['time_spent']} mins studied, {stats['quizzes']} quizzes taken, {stats['flashcards']} flashcard decks reviewed.\n"
     else:
-        objective = f"Generate a highly realistic, week-by-week study plan from TODAY ({today_str}) until their exams.\nCrucially, you MUST prioritize units with LOW mastery (low time spent, few quizzes) and IMPENDING exams.\nDO NOT generate study tasks for exams that have already passed (dates before {today_str})."
+        mastery_context += "No prior study telemetry logged yet (starting fresh).\n"
+
+    if notes_by_unit:
+        materials_context = "UPLOADED STUDY NOTES:\n"
+        for uc, titles in notes_by_unit.items():
+            materials_context += f"- Unit {uc}: {', '.join(titles)}\n"
+    else:
+        materials_context = (
+            "UPLOADED STUDY NOTES:\n"
+            "None uploaded yet. Build the study plan directly from the student's requested focus topics, registered units, and academic profile.\n"
+        )
+
+    safe_weeks = max(1, min(12, int(weeks or 4)))
+    if not exams:
+        objective = (
+            f"Generate a realistic, {safe_weeks}-week study plan starting from TODAY ({today_str}).\n"
+            "Prioritize the student's requested focus topics and registered units (especially units with low mastery). "
+            "If no notes are uploaded yet, recommend concrete topic-by-topic learning milestones, active recall, and practice tasks."
+        )
+    else:
+        objective = (
+            f"Generate a realistic, week-by-week study plan (up to {safe_weeks} weeks) from TODAY ({today_str}) until their exams.\n"
+            f"Crucially, prioritize units with LOW mastery and IMPENDING exams. DO NOT generate tasks for exams before {today_str}."
+        )
 
     prompt = f"""
-    You are an expert adaptive academic study planner. 
-    A university student needs a dynamic study plan based on their upcoming exams (if any) and their current mastery of the material.
-    They can study {hours_per_day} hours per day.
-    
+    You are an expert adaptive academic study planner.
+    A university student needs a practical study schedule. They can study {hours_per_day} hours per day.
+
+    {profile_context}
+    {custom_topics_context}
+    {units_context}
     {exam_context}
-    
     {mastery_context}
-    
     {materials_context}
-    
+
     {objective}
-    Include your AI reasoning for the focus of each week.
-    
+    Include your reasoning for the focus of each week.
+
     Return ONLY a valid JSON object with this schema:
     {{
-      "exam_date": "Date of earliest exam",
-      "total_weeks": 4,
-      "advice": "Brief overall advice tailored to their telemetry",
+      "exam_date": "{earliest_exam_label}",
+      "total_weeks": {safe_weeks},
+      "advice": "Brief overall advice tailored to their units, topics, and telemetry",
       "weeks": [
         {{
           "week_number": 1,
           "focus_area": "What to focus on this week",
-          "reasoning": "Explain why this was prioritized based on their telemetry/exam dates",
+          "reasoning": "Explain why this was prioritized",
           "daily_tasks": [
             {{
               "day": "Monday",
-              "task": "Specific study task (e.g. 'Review ICS 2404 Topic 1')",
+              "task": "Specific study task",
               "duration_hours": 2
             }}
           ]
@@ -939,27 +987,29 @@ async def generate_study_plan(
       ]
     }}
     """
-    
+
     try:
         response = execute_groq_completion(
             client=client,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
-            max_tokens=1400
+            max_tokens=1500
         )
         plan_data = json.loads(response.choices[0].message.content)
-        
+        if not plan_data.get("exam_date"):
+            plan_data["exam_date"] = earliest_exam_label
+
         # Save active plan to database
+        save_uid = user_obj_id if user_obj_id else user_id
         plan_doc = {
-            "user_id": user_obj_id,
+            "user_id": save_uid,
             "created_at": datetime.now(timezone.utc),
             "plan_data": plan_data
         }
-        # Replace existing active plan
-        study_plans_collection.delete_many({"user_id": user_obj_id, "type": "adaptive_plan"})
+        study_plans_collection.delete_many({**user_query, "type": "adaptive_plan"})
         plan_doc["type"] = "adaptive_plan"
         study_plans_collection.insert_one(plan_doc)
-        
+
         return plan_data
     except Exception as e:
         raise handle_gemini_error(e)
