@@ -19,6 +19,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
   const [interimText, setInterimText] = useState('');
   const [sttSupported] = useState(() => Boolean(getSpeechRecognition()));
   const [sttActive, setSttActive] = useState(false);
+  const [liveModeLabel, setLiveModeLabel] = useState('Recording & Transcribing…');
   const [sttError, setSttError] = useState('');
   const [loading, setLoading] = useState(false);
   const [savedNotice, setSavedNotice] = useState('');
@@ -26,9 +27,13 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const mimeTypeRef = useRef('audio/webm');
   const timerRef = useRef(null);
+  const chunkTimerRef = useRef(null);
   const recognitionRef = useRef(null);
   const isRecordingRef = useRef(false);
+  const sttGotResultRef = useRef(false);
+  const chunkInFlightRef = useRef(false);
 
   const stopSpeechRecognition = () => {
     isRecordingRef.current = false;
@@ -40,6 +45,34 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
         recognitionRef.current.stop();
       } catch {}
       recognitionRef.current = null;
+    }
+  };
+
+  const transcribeRecordedChunksLive = async () => {
+    if (!isRecordingRef.current || chunkInFlightRef.current) return;
+    if (sttGotResultRef.current) return; // Browser STT is already updating live
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (!audioChunksRef.current.length) return;
+
+    chunkInFlightRef.current = true;
+    try {
+      const snapshotBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current || 'audio/webm' });
+      if (snapshotBlob.size < 1000) return;
+
+      const formData = new FormData();
+      formData.append('file', snapshotBlob, `live_${Date.now()}.webm`);
+      const res = await api.post('/ai/transcribe-chunk', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const text = (res?.data?.text || '').trim();
+      if (text && isRecordingRef.current && !sttGotResultRef.current) {
+        setTranscript(text);
+        setLiveModeLabel('Live AI Transcription Active');
+      }
+    } catch {
+      // ignore transient live chunk errors; full audio still saved
+    } finally {
+      chunkInFlightRef.current = false;
     }
   };
 
@@ -56,9 +89,11 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
       recognition.onstart = () => {
         setSttActive(true);
         setSttError('');
+        setLiveModeLabel('Transcribing Live…');
       };
 
       recognition.onresult = (event) => {
+        sttGotResultRef.current = true;
         let finalAdded = '';
         let interim = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -80,17 +115,21 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
 
       recognition.onerror = (event) => {
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          setSttError('Microphone permission denied for live Speech-to-Text.');
           setSttActive(false);
-        } else if (event.error === 'network') {
-          setSttError('Live Speech-to-Text unavailable offline — audio is still recording.');
+        } else if (event.error === 'audio-capture' || event.error === 'aborted' || event.error === 'network') {
+          // Mobile browsers often lock mic for MediaRecorder; live Whisper chunk loop takes over seamlessly
+          setSttActive(false);
+          setLiveModeLabel(
+            typeof navigator !== 'undefined' && navigator.onLine
+              ? 'Live AI Transcription Active'
+              : 'Recording Audio Offline'
+          );
         }
       };
 
-      // Chrome stops SpeechRecognition after brief silence; auto-restart while recording
       recognition.onend = () => {
         setInterimText('');
-        if (isRecordingRef.current) {
+        if (isRecordingRef.current && sttGotResultRef.current) {
           try {
             recognition.start();
           } catch {
@@ -104,13 +143,14 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
       recognitionRef.current = recognition;
       recognition.start();
     } catch {
-      setSttError('Could not start live Speech-to-Text in this browser.');
+      setSttActive(false);
     }
   };
 
   useEffect(() => {
     if (!isOpen) {
       stopSpeechRecognition();
+      clearInterval(chunkTimerRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         try {
           mediaRecorderRef.current.stop();
@@ -122,6 +162,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
     }
     return () => {
       stopSpeechRecognition();
+      clearInterval(chunkTimerRef.current);
       clearInterval(timerRef.current);
     };
   }, [isOpen]);
@@ -129,33 +170,61 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
   const startRecording = async () => {
     setSttError('');
     setSavedNotice('');
+    setTranscript('');
+    setInterimText('');
+    sttGotResultRef.current = false;
+    chunkInFlightRef.current = false;
+    isRecordingRef.current = true;
+
+    // Start browser SpeechRecognition synchronously inside the click gesture first
+    if (sttSupported) {
+      startSpeechRecognition();
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
+      const preferredMime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+      const recorder = preferredMime
+        ? new MediaRecorder(stream, { mimeType: preferredMime })
+        : new MediaRecorder(stream);
+
+      mimeTypeRef.current = recorder.mimeType || 'audio/webm';
+      mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
       };
 
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current || 'audio/webm' });
         setAudioBlob(blob);
       };
 
-      mediaRecorderRef.current.start();
-      isRecordingRef.current = true;
+      // Emit chunks every 4s so live AI transcription works on Android/iOS even when mic is locked
+      recorder.start(4000);
       setIsRecording(true);
       setRecordingTime(0);
-
-      if (sttSupported) {
-        startSpeechRecognition();
-      }
+      setLiveModeLabel(
+        sttSupported
+          ? 'Transcribing Live…'
+          : typeof navigator !== 'undefined' && navigator.onLine
+            ? 'Live AI Transcription Active'
+            : 'Recording Audio Offline'
+      );
 
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
+
+      chunkTimerRef.current = setInterval(() => {
+        transcribeRecordedChunksLive();
+      }, 5000);
     } catch {
+      isRecordingRef.current = false;
+      stopSpeechRecognition();
       alert('Microphone access is required to record lectures.');
     }
   };
@@ -164,6 +233,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
     isRecordingRef.current = false;
     stopSpeechRecognition();
     clearInterval(timerRef.current);
+    clearInterval(chunkTimerRef.current);
     setIsRecording(false);
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -188,7 +258,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
           title: noteTitle,
           filename,
           fileType: 'audio_lecture',
-          mimeType: 'audio/webm',
+          mimeType: mimeTypeRef.current || 'audio/webm',
           unitCode: cleanUnit,
           endpoint: '/ai/transcribe-audio',
           file: audioBlob,
@@ -223,7 +293,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
           title: noteTitle,
           filename,
           fileType: 'audio_lecture',
-          mimeType: 'audio/webm',
+          mimeType: mimeTypeRef.current || 'audio/webm',
           unitCode: cleanUnit,
           endpoint: '/ai/transcribe-audio',
           file: audioBlob,
@@ -252,6 +322,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
 
   const resetCapture = () => {
     stopSpeechRecognition();
+    clearInterval(chunkTimerRef.current);
     setAudioBlob(null);
     setTranscript('');
     setInterimText('');
@@ -284,9 +355,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
                 <span className="text-[10px] uppercase font-bold tracking-wider">Record</span>
               </button>
               <p className="text-[11px] text-slate-400">
-                {sttSupported
-                  ? 'Tap Record to capture lecture audio and transcribe speech to text live.'
-                  : 'Tap Record to capture lecture audio and transcribe on save.'}
+                Tap Record to capture lecture audio and transcribe speech to text live.
               </p>
             </div>
           )}
@@ -302,8 +371,8 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
               <div className="text-left bg-slate-950/90 border border-slate-800 rounded-2xl p-3">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${sttActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-                    {sttActive ? 'Transcribing Live…' : 'Recording Audio'}
+                    <span className={`w-2 h-2 rounded-full ${sttActive || transcript ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-pulse'}`} />
+                    {liveModeLabel}
                   </span>
                   {transcript && (
                     <span className="text-[10px] text-slate-500 font-mono">
@@ -311,7 +380,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
                     </span>
                   )}
                 </div>
-                <div className="max-h-32 overflow-y-auto text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">
+                <div className="max-h-36 overflow-y-auto text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">
                   {transcript || interimText ? (
                     <>
                       <span>{transcript}</span>
@@ -321,9 +390,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
                     </>
                   ) : (
                     <span className="text-slate-500 italic">
-                      {sttSupported
-                        ? 'Listening… spoken words appear here live.'
-                        : 'Recording audio cleanly — AI will transcribe when you save.'}
+                      Listening… spoken words will appear here live as you record.
                     </span>
                   )}
                 </div>

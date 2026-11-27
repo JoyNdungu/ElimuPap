@@ -1148,6 +1148,29 @@ async def ocr_scanned_note(
 # ============================================================================
 # FEATURE 8: Audio Lecture Transcriber & Summarizer
 # ============================================================================
+@router.post("/transcribe-chunk")
+async def transcribe_audio_chunk(
+    file: UploadFile = File(...),
+    token: str = Depends(oauth2_scheme)
+):
+    """Lightweight live-transcription endpoint used while recording when browser STT is unavailable."""
+    get_current_user_id(token)
+    try:
+        audio_bytes = await file.read()
+        if not audio_bytes or len(audio_bytes) < 500:
+            return {"text": ""}
+        client = get_grok_client()
+        transcription = client.audio.transcriptions.create(
+            file=(file.filename or "chunk.webm", audio_bytes),
+            model="whisper-large-v3"
+        )
+        text = (getattr(transcription, "text", "") or "").strip()
+        return {"text": text}
+    except Exception as e:
+        print(f"Live chunk transcription notice: {e}")
+        return {"text": ""}
+
+
 @router.post("/transcribe-audio")
 async def transcribe_lecture_audio(
     file: UploadFile = File(...),
