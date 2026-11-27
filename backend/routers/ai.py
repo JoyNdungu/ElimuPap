@@ -159,17 +159,18 @@ def prepare_note_text_for_ai(text: str, max_chars: int = 7500) -> str:
         + text[-tail_size:]
     )
 
-def execute_groq_completion(client, messages, response_format=None, max_tokens=1400, model=None, reasoning_effort="low"):
+def execute_groq_completion(client, messages, response_format=None, max_tokens=1400, model=None, reasoning_effort="low", temperature=0.2):
     """
-    Executes Groq chat completion with strict max_tokens reservation and
-    automatic self-healing retry on 413 / 429 / rate_limit_exceeded errors.
+    Executes Groq chat completion with strict max_tokens reservation, low-temperature
+    factual grounding, and automatic self-healing retry on 413 / 429 / rate_limit_exceeded errors.
     """
     import time
     target_model = model or DEFAULT_MODEL
     kwargs = {
         "model": target_model,
         "messages": messages,
-        "max_tokens": max_tokens
+        "max_tokens": max_tokens,
+        "temperature": temperature,
     }
     if response_format:
         kwargs["response_format"] = response_format
@@ -366,7 +367,8 @@ async def tutor_chat(req: TutorRequest, user_id: str = Depends(get_current_user_
                 model=DEFAULT_MODEL,
                 messages=messages,
                 stream=True,
-                max_tokens=850
+                max_tokens=850,
+                temperature=0.25
             )
             for chunk in response_stream:
                 if chunk.choices[0].delta.content is not None:
@@ -583,7 +585,8 @@ async def generate_summary(req: GenerateRequest, user_id: str = Depends(get_curr
 @router.post("/quiz")
 async def generate_quiz(req: QuizRequest, user_id: str = Depends(get_current_user_id)):
     client = get_grok_client()
-    note = notes_collection.find_one({"_id": ObjectId(req.note_id), "user_id": ObjectId(user_id)})
+    user_query = {"$or": [{"user_id": ObjectId(user_id)}, {"user_id": user_id}]} if ObjectId.is_valid(user_id) else {"user_id": user_id}
+    note = notes_collection.find_one({"_id": ObjectId(req.note_id), **user_query})
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
 
@@ -599,9 +602,14 @@ async def generate_quiz(req: QuizRequest, user_id: str = Depends(get_current_use
         quiz_instructions = "Generate a balanced combination of multiple-choice and text-answer questions."
 
     prompt = f"""
-    Generate a {req.num_questions}-question quiz based on the following notes.
+    Generate a {req.num_questions}-question quiz strictly grounded in the following notes.
     {quiz_instructions}
-    
+
+    ACCURACY & GROUNDING REQUIREMENTS:
+    - Every question, answer, and distractor must be directly supported by the provided notes. Do NOT invent facts outside the notes.
+    - Ensure each question has one unambiguous correct answer. For multiple_choice, "correct_answer" MUST match one exact entry in "options".
+    - In every "explanation", briefly cite the supporting fact, definition, or slide/section from the notes (e.g., "Based on Slide 3 / the notes: ...").
+
     Return ONLY a valid JSON object with the following schema:
     {{
       "quiz_title": "Quiz Title",
@@ -609,16 +617,16 @@ async def generate_quiz(req: QuizRequest, user_id: str = Depends(get_current_use
         {{
           "type": "multiple_choice",
           "question": "Question text",
-          "options": ["A", "B", "C", "D"],
-          "correct_answer": "A",
-          "explanation": "Why A is correct"
+          "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+          "correct_answer": "Option 1",
+          "explanation": "Why Option 1 is correct, citing the supporting fact or slide/section from the notes"
         }},
         {{
           "type": "text_answer",
           "question": "Question text",
           "options": [],
           "correct_answer": "The expected key points or short ideal answer",
-          "explanation": "Detailed explanation of the correct answer"
+          "explanation": "Detailed explanation citing the supporting fact or slide/section from the notes"
         }}
       ]
     }}
@@ -633,7 +641,8 @@ async def generate_quiz(req: QuizRequest, user_id: str = Depends(get_current_use
             client=client,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
-            max_tokens=1200
+            max_tokens=1200,
+            temperature=0.2
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
