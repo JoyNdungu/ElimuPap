@@ -11,6 +11,7 @@ import {
   generateOfflineFlashcards,
   generateOfflineMindMap,
 } from '../utils/offlineAiTools';
+import { Brain, Cpu, FileText, Layers, Sparkles, Target } from '../components/Icons';
 import api from '../api/axios';
 
 const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
@@ -711,7 +712,7 @@ export default function NoteViewerPage() {
                   : 'bg-teal-50 text-teal-800 border-teal-200 hover:bg-teal-100'
               }`}
             >
-              <span>🤖</span>
+              <Cpu className="w-4 h-4" />
               <span className="hidden sm:inline">Ask</span> Tutor
             </button>
           </div>
@@ -727,7 +728,7 @@ export default function NoteViewerPage() {
                 : (isDark ? 'bg-white/5 text-gray-400 hover:text-white' : 'bg-[#f8fafc] text-slate-600 border border-slate-200 hover:text-slate-900')
             }`}
           >
-            <span>📄</span>
+            <FileText className="w-4 h-4" />
             <span>Document</span>
           </button>
           <button
@@ -738,7 +739,7 @@ export default function NoteViewerPage() {
                 : (isDark ? 'bg-white/5 text-gray-400 hover:text-white' : 'bg-[#f8fafc] text-slate-600 border border-slate-200 hover:text-slate-900')
             }`}
           >
-            <span>✨</span>
+            <Sparkles className="w-4 h-4" />
             <span>AI Study Tools {activeTool ? `(${activeTool})` : ''}</span>
           </button>
         </div>
@@ -789,9 +790,9 @@ export default function NoteViewerPage() {
                 style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : '#e2e8f0'}` }}
               >
                 {[
-                  { endpoint: 'summary',    name: 'Summary',   icon: '📝' },
-                  { endpoint: 'flashcards', name: 'Flashcards', icon: '🃏' },
-                  { endpoint: 'mindmap',    name: 'Mind Map',   icon: '🧠' },
+                  { endpoint: 'summary',    name: 'Summary',    icon: <FileText className="w-5 h-5 text-[#2563EB]" /> },
+                  { endpoint: 'flashcards', name: 'Flashcards', icon: <Layers className="w-5 h-5 text-emerald-500" /> },
+                  { endpoint: 'mindmap',    name: 'Mind Map',   icon: <Brain className="w-5 h-5 text-violet-500" /> },
                 ].map(({ endpoint, name, icon }) => (
                   <button
                     key={name}
@@ -806,7 +807,7 @@ export default function NoteViewerPage() {
                         : (isDark ? 'rgba(255,255,255,0.05)' : '#e2e8f0'),
                     }}
                   >
-                    <span className="text-xl">{icon}</span>
+                    <span>{icon}</span>
                     <span className={`text-[11px] font-medium ${activeTool === name && !isDark ? 'text-[#1D4ED8]' : headingClr}`}>{name}</span>
                   </button>
                 ))}
@@ -820,7 +821,7 @@ export default function NoteViewerPage() {
                     borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#e2e8f0',
                   }}
                 >
-                  <span className="text-xl">🎯</span>
+                  <Target className="w-5 h-5 text-amber-500" />
                   <span className={`text-[11px] font-medium ${headingClr}`}>Quiz</span>
                 </button>
               </div>

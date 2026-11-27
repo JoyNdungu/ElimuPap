@@ -5,6 +5,21 @@ import api from '../api/axios';
 import ReactMarkdown from 'react-markdown';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import {
+  BookOpen,
+  FileText,
+  GraduationCap,
+  HelpCircle,
+  Layers,
+  Lightbulb,
+  MessageSquare,
+  Mic,
+  RefreshCw,
+  Sliders,
+  Sparkles,
+  Target,
+  Zap,
+} from '../components/Icons';
 
 function createConversationId() {
   return `conv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -99,7 +114,7 @@ function TutorLeftPanel({
                 : (isDark ? 'text-gray-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
             }`}
           >
-            <span>📚</span>
+            <span><BookOpen className="w-3.5 h-3.5" /></span>
             <span>Notes</span>
           </button>
           <button
@@ -110,7 +125,7 @@ function TutorLeftPanel({
                 : (isDark ? 'text-gray-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
             }`}
           >
-            <span>💬</span>
+            <span><MessageSquare className="w-3.5 h-3.5" /></span>
             <span>History</span>
             {conversations.length > 0 && (
               <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
@@ -223,7 +238,9 @@ function TutorLeftPanel({
                                 : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                             }`}
                           >
-                            <span className="text-xs">{isAudio ? '🎙️' : '📄'}</span>
+                            <span className="flex-shrink-0 opacity-80">
+                              {isAudio ? <Mic className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                            </span>
                             <span className="truncate flex-1">{n.title}</span>
                           </button>
                         );
@@ -694,25 +711,25 @@ export default function TutorPage() {
   // Quick Action Starters for Empty State
   const STARTER_CARDS = [
     {
-      icon: '💡',
+      icon: <Lightbulb className="w-5 h-5 text-amber-500" />,
       title: 'Simple Analogy',
       desc: 'Explain core concept in real-world everyday terms',
       prompt: activeNote ? `Explain the core concept in "${activeNote.title}" using a colorful everyday analogy.` : 'Explain a challenging concept using a relatable everyday analogy.'
     },
     {
-      icon: '🎯',
+      icon: <Target className="w-5 h-5 text-rose-500" />,
       title: 'Exam Drill',
       desc: 'What are the top exam questions professors ask?',
       prompt: activeNote ? `What are the top 3 high-yield exam questions most likely to appear from "${activeNote.title}"?` : 'Give me 3 high-yield exam questions and model marking points for this topic.'
     },
     {
-      icon: '⚡',
+      icon: <Zap className="w-5 h-5 text-blue-500" />,
       title: '5-Minute Crash Course',
       desc: 'High-impact key takeaways & principles',
       prompt: activeNote ? `Give me a high-yield 5-minute crash course on "${activeNote.title}".` : 'Give me a fast 5-minute crash course on the fundamentals.'
     },
     {
-      icon: '🎮',
+      icon: <HelpCircle className="w-5 h-5 text-emerald-500" />,
       title: 'Pop Quiz Challenge',
       desc: 'Test knowledge with a turn-by-turn trivia challenge',
       prompt: activeNote ? `Start an interactive pop quiz on "${activeNote.title}". Ask me question #1!` : 'Start a rapid pop quiz to test my active recall. Give me the first question!'
@@ -855,13 +872,13 @@ export default function TutorPage() {
                 setPanelOpen(true);
               }}
               title="View past conversations"
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition border flex items-center gap-1 ${
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition border flex items-center gap-1.5 ${
                 isDark
                   ? 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
                   : 'bg-[#f8fafc] text-slate-700 border-slate-200 hover:bg-slate-100'
               }`}
             >
-              <span>💬</span>
+              <MessageSquare className="w-3.5 h-3.5 text-[#2563EB]" />
               <span>History</span>
               {conversations.length > 0 && (
                 <span className="text-[10px] font-mono opacity-80">({conversations.length})</span>
@@ -898,7 +915,7 @@ export default function TutorPage() {
                       className="w-full h-full rounded-[22px] flex items-center justify-center"
                       style={{ backgroundColor: isDark ? '#171723' : '#ffffff' }}
                     >
-                      <span className="text-3xl animate-bounce">🎓</span>
+                      <GraduationCap className="w-8 h-8 text-[#2563EB]" />
                     </div>
                   </div>
                   <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-white font-mono shadow">
@@ -927,7 +944,7 @@ export default function TutorPage() {
                           : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50'
                       }`}
                     >
-                      <span className={`text-2xl p-2 rounded-xl group-hover:scale-110 transition-transform ${
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform ${
                         isDark ? 'bg-white/5' : 'bg-[#f8fafc] border border-slate-200'
                       }`}>
                         {card.icon}
@@ -966,7 +983,7 @@ export default function TutorPage() {
                         : 'bg-slate-200 text-slate-700 border border-slate-300'
                     }`}>
                       {isAssistant ? (
-                        <span className="text-xs">✨</span>
+                        <Sparkles className="w-4 h-4" />
                       ) : (
                         <span className="text-xs font-bold">You</span>
                       )}
@@ -1049,21 +1066,22 @@ export default function TutorPage() {
                         <div className="flex items-center gap-1.5 flex-wrap pt-1 animate-fade-in pl-1">
                           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mr-1">Quick Dive:</span>
                           {[
-                            { label: '💡 Real Example', prompt: 'Can you give me a real-world everyday example of this?' },
-                            { label: '🎯 Exam Trap', prompt: 'What mistake do students commonly make on exams regarding this?' },
-                            { label: '📝 Quiz Me', prompt: 'Quiz me on this concept with 1 multiple choice question!' },
-                            { label: '🔄 Simpler', prompt: 'Can you explain this in even simpler, plain terms?' },
+                            { icon: <Lightbulb className="w-3.5 h-3.5 text-amber-500" />, label: 'Real Example', prompt: 'Can you give me a real-world everyday example of this?' },
+                            { icon: <Target className="w-3.5 h-3.5 text-rose-500" />, label: 'Exam Trap', prompt: 'What mistake do students commonly make on exams regarding this?' },
+                            { icon: <HelpCircle className="w-3.5 h-3.5 text-blue-500" />, label: 'Quiz Me', prompt: 'Quiz me on this concept with 1 multiple choice question!' },
+                            { icon: <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />, label: 'Simpler', prompt: 'Can you explain this in even simpler, plain terms?' },
                           ].map((chip, idx) => (
                             <button
                               key={idx}
                               onClick={() => handleSendPrompt(chip.prompt)}
-                              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all shadow-sm ${
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all shadow-sm ${
                                 isDark
                                   ? 'bg-white/5 hover:bg-blue-500/20 text-gray-300 hover:text-blue-200 border-white/10 hover:border-blue-500/40'
                                   : 'bg-white hover:bg-blue-50 text-slate-700 hover:text-[#2563EB] border-slate-200 hover:border-blue-300'
                               }`}
                             >
-                              {chip.label}
+                              {chip.icon}
+                              <span>{chip.label}</span>
                             </button>
                           ))}
                         </div>
@@ -1079,7 +1097,7 @@ export default function TutorPage() {
               <div className="flex justify-start animate-fade-in">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#2563EB] text-white shadow">
-                    <span className="text-xs">✨</span>
+                    <Sparkles className="w-4 h-4" />
                   </div>
                   <div className={`px-5 py-3.5 rounded-2xl rounded-tl-sm flex items-center gap-2 border shadow-sm ${
                     isDark ? 'bg-[#1F1F2A] border-white/10' : 'bg-white border-slate-200'
@@ -1120,7 +1138,7 @@ export default function TutorPage() {
                   }`}
                   title="Study formats"
                 >
-                  <span className="text-sm">🎲</span>
+                  <Sliders className="w-4 h-4" />
                 </button>
 
                 {showTestMenu && (
@@ -1133,10 +1151,10 @@ export default function TutorPage() {
                       Interactive Formats:
                     </p>
                     {[
-                      { icon: '📝', label: 'Practice Questions', prompt: 'Generate 3 exam practice questions based on this material.' },
-                      { icon: '🎮', label: 'Quiz Game', prompt: 'Turn this into an interactive trivia quiz. Ask me question 1!' },
-                      { icon: '🗂️', label: 'Flashcards', prompt: 'Extract 4 high-yield flashcard concepts (Front/Back) from this material.' },
-                      { icon: '💡', label: 'Real Analogy', prompt: 'Give me a vivid, funny real-world analogy to help me remember this.' }
+                      { icon: <FileText className="w-3.5 h-3.5 text-blue-500" />, label: 'Practice Questions', prompt: 'Generate 3 exam practice questions based on this material.' },
+                      { icon: <HelpCircle className="w-3.5 h-3.5 text-emerald-500" />, label: 'Quiz Game', prompt: 'Turn this into an interactive trivia quiz. Ask me question 1!' },
+                      { icon: <Layers className="w-3.5 h-3.5 text-purple-500" />, label: 'Flashcards', prompt: 'Extract 4 high-yield flashcard concepts (Front/Back) from this material.' },
+                      { icon: <Lightbulb className="w-3.5 h-3.5 text-amber-500" />, label: 'Real Analogy', prompt: 'Give me a vivid, funny real-world analogy to help me remember this.' }
                     ].map(item => (
                       <button
                         key={item.label}
@@ -1149,7 +1167,8 @@ export default function TutorPage() {
                           isDark ? 'text-gray-300 hover:text-white hover:bg-white/5' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
                         }`}
                       >
-                        <span>{item.icon}</span> {item.label}
+                        <span className="flex-shrink-0">{item.icon}</span>
+                        <span>{item.label}</span>
                       </button>
                     ))}
                   </div>

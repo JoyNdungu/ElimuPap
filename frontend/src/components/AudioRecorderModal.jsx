@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Loader2, Upload, FileAudio, X } from './Icons';
+import { Mic, Square, Loader2, Upload, FileAudio, X, MessageSquare } from './Icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { enqueueOfflineUpload } from '../utils/offlineUploads';
@@ -363,24 +363,26 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
             <button
               type="button"
               onClick={() => setCaptureMode('audio_stt')}
-              className={`py-2 px-3 rounded-lg transition ${
+              className={`py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5 ${
                 captureMode === 'audio_stt'
                   ? 'bg-rose-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              🎙️ Audio + Speech-to-Text
+              <Mic className="w-3.5 h-3.5" />
+              <span>Audio + Speech-to-Text</span>
             </button>
             <button
               type="button"
               onClick={() => setCaptureMode('stt_only')}
-              className={`py-2 px-3 rounded-lg transition ${
+              className={`py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5 ${
                 captureMode === 'stt_only'
                   ? 'bg-[#2563EB] text-white shadow-sm'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              🗣️ Speech-to-Text Notes
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Speech-to-Text Notes</span>
             </button>
           </div>
         )}

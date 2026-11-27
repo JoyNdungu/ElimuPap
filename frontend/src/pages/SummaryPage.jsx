@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useTheme } from '../context/ThemeContext';
+import { BookOpen, FileText, HelpCircle, Layers, Lightbulb, Target, Zap } from '../components/Icons';
 import api from '../api/axios';
 import { getPendingUploadById } from '../utils/offlineUploads';
 import { extractTextFromFileClient } from '../utils/offlineExtractor';
@@ -196,7 +197,7 @@ ${summaryData.definitions?.map(d => `- **${d.term}**: ${d.definition}`).join('\n
                 <div className={`absolute inset-0 rounded-full border-4 ${isDark ? 'border-white/5' : 'border-slate-200'}`}></div>
                 <div className="absolute inset-0 rounded-full border-4 border-[#2563EB] border-t-transparent animate-spin"></div>
                 <div className={`absolute inset-2 rounded-full flex items-center justify-center ${isDark ? 'bg-[#2563EB]/15' : 'bg-blue-50'}`}>
-                  <span className="text-xl">📊</span>
+                  <BookOpen className="w-6 h-6 text-[#2563EB]" />
                 </div>
               </div>
               <h2 className={`text-lg font-semibold mb-2 ${headingClr}`}>Synthesizing Presentation &amp; Notes</h2>
@@ -246,7 +247,7 @@ ${summaryData.definitions?.map(d => `- **${d.term}**: ${d.definition}`).join('\n
                         ? 'bg-[#2563EB]/20 text-blue-300 border-[#2563EB]/30'
                         : 'bg-blue-50 text-[#1D4ED8] border-blue-200'
                     }`}>
-                      <span>🎬</span>
+                      <BookOpen className="w-3.5 h-3.5" />
                       <span>{summaryData.doc_type || 'Slide Presentation Summary'}</span>
                     </span>
                     {summaryData.sections && (
@@ -307,11 +308,11 @@ ${summaryData.definitions?.map(d => `- **${d.term}**: ${d.definition}`).join('\n
               {/* ── Modern Navigation Tabs ── */}
               <div className={`flex border-b gap-2 sm:gap-6 overflow-x-auto no-scrollbar ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                 {[
-                  { id: 'sections', label: 'Slide Modules & Walkthrough', icon: '📑', count: summaryData.sections?.length },
-                  { id: 'overview', label: 'Detailed Summary', icon: '📝' },
-                  { id: 'exam', label: 'Exam Hotspots', icon: '🎯', count: summaryData.exam_highlights?.length },
-                  { id: 'definitions', label: 'Glossary & Terms', icon: '💡', count: summaryData.definitions?.length },
-                  { id: 'quiz', label: 'Self-Check Quiz', icon: '❓', count: summaryData.quick_quiz?.length },
+                  { id: 'sections', label: 'Slide Modules & Walkthrough', icon: <Layers className="w-4 h-4" />, count: summaryData.sections?.length },
+                  { id: 'overview', label: 'Detailed Summary', icon: <FileText className="w-4 h-4" /> },
+                  { id: 'exam', label: 'Exam Hotspots', icon: <Target className="w-4 h-4" />, count: summaryData.exam_highlights?.length },
+                  { id: 'definitions', label: 'Glossary & Terms', icon: <Lightbulb className="w-4 h-4" />, count: summaryData.definitions?.length },
+                  { id: 'quiz', label: 'Self-Check Quiz', icon: <HelpCircle className="w-4 h-4" />, count: summaryData.quick_quiz?.length },
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -469,7 +470,7 @@ ${summaryData.definitions?.map(d => `- **${d.term}**: ${d.definition}`).join('\n
                             ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                             : 'bg-amber-100 text-amber-800 border-amber-200'
                         }`}>
-                          ⚡
+                          <Zap className="w-4 h-4" />
                         </span>
                         <div className="space-y-1">
                           <p className={`text-xs font-bold uppercase tracking-wider ${
