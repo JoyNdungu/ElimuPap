@@ -233,9 +233,10 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
         const res = await api.post('/notes/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        const createdId = res?.data?.id || res?.data?.note_id;
         window.dispatchEvent(new CustomEvent('elimupap:data-changed'));
         onClose();
-        navigate(`/notes/${res.data.id}`);
+        navigate(createdId ? `/notes/${createdId}` : '/notes');
       } catch (err) {
         if (!err?.response) {
           const queued = await enqueueOfflineUpload({
@@ -297,9 +298,10 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
       const res = await api.post('/ai/transcribe-audio', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      const createdId = res?.data?.id || res?.data?.note_id;
       window.dispatchEvent(new CustomEvent('elimupap:data-changed'));
       onClose();
-      navigate(`/notes/${res.data.id}`);
+      navigate(createdId ? `/notes/${createdId}` : '/notes');
     } catch (err) {
       if (!err?.response) {
         const queued = await enqueueOfflineUpload({

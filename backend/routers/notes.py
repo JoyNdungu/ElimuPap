@@ -341,33 +341,41 @@ def upload_note(
             detail="Legacy formats (.doc, .ppt) are not supported. Please upload .docx, .pptx, or .pdf files.",
         )
 
-    # Save record immediately with extraction_status = 'pending'
+    # Extract plain text synchronously for .txt / .md so Speech-to-Text notes open immediately
+    sync_text = ""
+    is_plain_text = file_extension in ("txt", "md")
+    if is_plain_text:
+        sync_text = extract_text_from_file(file_path, file_extension)
+
+    # Save record immediately with extraction_status = 'pending' (or 'done' for instant text notes)
     note_doc = {
         "user_id": ObjectId(user_id),
         "title": title,
-        "unit_code": unit_code,
+        "unit_code": unit_code or "GENERAL",
         "topic": topic,
         "filename": file.filename,
         "safe_filename": safe_filename,
         "file_path": file_path,
         "file_type": file_extension,
-        "extracted_text": "",
-        "extraction_status": "pending",
+        "extracted_text": sync_text,
+        "extraction_status": "done" if is_plain_text else "pending",
         "created_at": datetime.utcnow(),
     }
     result = notes_collection.insert_one(note_doc)
     note_id = result.inserted_id
 
-    # Kick off extraction in background — upload returns immediately
-    thread = threading.Thread(
-        target=_extract_and_save,
-        args=(note_id, file_path, file_extension),
-        daemon=True,
-    )
-    thread.start()
+    if not is_plain_text:
+        # Kick off extraction in background — upload returns immediately
+        thread = threading.Thread(
+            target=_extract_and_save,
+            args=(note_id, file_path, file_extension),
+            daemon=True,
+        )
+        thread.start()
 
     return {
         "message": "File uploaded successfully. Text extraction is processing in the background.",
+        "id": str(note_id),
         "note_id": str(note_id),
         "filename": file.filename,
     }

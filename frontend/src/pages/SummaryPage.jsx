@@ -7,7 +7,7 @@ import api from '../api/axios';
 import { getPendingUploadById } from '../utils/offlineUploads';
 import { extractTextFromFileClient } from '../utils/offlineExtractor';
 import { getCachedResponse, saveCachedResponse } from '../utils/offlineCache';
-import { generateOfflineSummary } from '../utils/offlineAiTools';
+import { detectNonStudyNote, generateOfflineSummary } from '../utils/offlineAiTools';
 
 export default function SummaryPage() {
   const { isDark } = useTheme();
@@ -40,6 +40,10 @@ export default function SummaryPage() {
     if (!noteObj) {
       noteObj = { id: noteId, title: 'Study Note', extracted_text: '' };
     }
+    const nonStudyReason = detectNonStudyNote(noteObj);
+    if (nonStudyReason) {
+      return { __nonStudyError: `Not study-related: ${nonStudyReason}` };
+    }
     const generated = generateOfflineSummary(noteObj);
     saveCachedResponse('post', '/ai/summary', { note_id: noteId }, generated);
     return generated;
@@ -51,6 +55,11 @@ export default function SummaryPage() {
 
     if (noteId?.startsWith('offline_upload_') || (typeof navigator !== 'undefined' && !navigator.onLine)) {
       const offlineSummary = await buildOfflineSummaryFallback();
+      if (offlineSummary?.__nonStudyError) {
+        setError(offlineSummary.__nonStudyError);
+        setLoading(false);
+        return;
+      }
       if (offlineSummary) {
         setSummaryData(offlineSummary);
         setLoading(false);
@@ -66,6 +75,11 @@ export default function SummaryPage() {
     } catch (err) {
       if (!err?.response || (typeof navigator !== 'undefined' && !navigator.onLine)) {
         const offlineSummary = await buildOfflineSummaryFallback();
+        if (offlineSummary?.__nonStudyError) {
+          setError(offlineSummary.__nonStudyError);
+          setLoading(false);
+          return;
+        }
         if (offlineSummary) {
           setSummaryData(offlineSummary);
           setLoading(false);
@@ -73,7 +87,7 @@ export default function SummaryPage() {
         }
       }
       console.error("Failed to fetch summary:", err);
-      setError("Failed to generate summary. The document might not contain readable text.");
+      setError(err?.response?.data?.detail || "Failed to generate summary. The document might not contain readable text.");
     } finally {
       setLoading(false);
     }

@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useTheme } from '../context/ThemeContext';
 import { getOfflineFileUrl, FILES_CACHE_NAME } from '../utils/offlineSync';
-import { getPendingUploadById } from '../utils/offlineUploads';
+import { getPendingUploadById, removePendingUpload } from '../utils/offlineUploads';
 import { extractTextFromFileClient } from '../utils/offlineExtractor';
 import { getCachedResponse, saveCachedResponse } from '../utils/offlineCache';
 import {
+  detectNonStudyNote,
   generateOfflineSummary,
   generateOfflineFlashcards,
   generateOfflineMindMap,
@@ -396,6 +397,13 @@ export default function NoteViewerPage() {
     setToolData(null);
     setToolError('');
 
+    const nonStudyReason = detectNonStudyNote(note);
+    if (nonStudyReason) {
+      setToolError(`Not study-related: ${nonStudyReason}`);
+      setToolLoading(false);
+      return;
+    }
+
     // Offline-uploaded notes don't exist on the server yet — generate directly offline
     if (note?.isOfflinePending || (typeof navigator !== 'undefined' && !navigator.onLine)) {
       try {
@@ -612,9 +620,42 @@ export default function NoteViewerPage() {
     }
 
     // 5. Generic text fallback / Image Preview / Audio Player
+    const nonStudyWarning = detectNonStudyNote(note);
+    const handleDeleteAccidentalNote = async () => {
+      if (!window.confirm(`Delete "${note?.title || 'this recording'}"?`)) return;
+      try {
+        if (note?.isOfflinePending) {
+          await removePendingUpload(note.id);
+        } else {
+          const token = localStorage.getItem('elimupap_token');
+          await api.delete(`/notes/${noteId}`, { headers: { Authorization: `Bearer ${token}` } });
+        }
+        navigate('/notes');
+      } catch (err) {
+        alert(err?.response?.data?.detail || 'Failed to delete recording.');
+      }
+    };
+
     return (
       <div className="w-full h-full overflow-y-auto">
         <div className={`p-8 max-w-[800px] mx-auto ${isDark ? 'text-gray-200' : 'text-slate-800'}`}>
+          {nonStudyWarning && (
+            <div className={`mb-6 p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'
+            }`}>
+              <div className="text-xs leading-relaxed">
+                <p className="font-bold uppercase tracking-wider text-[10px] mb-1">Non-Study Content Detected</p>
+                <p>{nonStudyWarning}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleDeleteAccidentalNote}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition flex-shrink-0"
+              >
+                Delete Recording
+              </button>
+            </div>
+          )}
           {note?.file_type === 'ocr_image' && offlineImageUrl && (
             <div className="mb-6 rounded-2xl overflow-hidden border border-slate-700/40 shadow-sm">
               <img src={offlineImageUrl} alt={note.title || 'Uploaded image'} className="w-full max-h-[70vh] object-contain bg-black/20" />

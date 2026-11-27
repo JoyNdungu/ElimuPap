@@ -221,6 +221,72 @@ class QuizRequest(BaseModel):
     quiz_type: str = "multiple_choice" # "multiple_choice", "text_answer", "combination"
     num_questions: int = 5
 
+def classify_study_relevance(text: str, client=None) -> tuple[bool, str]:
+    """
+    Determine whether an audio transcript or note contains academic/study material
+    rather than accidental recording, silence, mic-test chatter, or off-topic casual speech.
+    Fails open (True) on transient API errors so real lectures are never wrongly blocked.
+    """
+    clean = (text or "").strip()
+    placeholder = "Audio lecture recorded. You can listen to the original audio recording using the player above."
+    if not clean or clean == placeholder:
+        return False, "No spoken study content or transcript was detected in this recording."
+
+    words = [w for w in clean.split() if any(ch.isalnum() for ch in w)]
+    if len(words) < 4:
+        return False, "The recording is too short or accidental to contain study material."
+
+    try:
+        active_client = client or get_grok_client()
+        prompt = (
+            "Classify whether the following audio transcript is educational, academic, "
+            "or study-related (lecture, tutorial, concepts, definitions, exam prep, student notes), "
+            "OR whether it is non-study / accidental audio (mic testing like 'testing 123', "
+            "casual greetings or daily chit-chat, meal/social talk, background noise, or gibberish).\n\n"
+            f"Transcript:\n{clean[:1500]}\n\n"
+            'Return ONLY strict JSON: {"is_study_related": true or false, "reason": "brief 1-sentence reason"}'
+        )
+        res = execute_groq_completion(
+            client=active_client,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            max_tokens=120,
+            temperature=0.0,
+        )
+        parsed = json.loads(res.choices[0].message.content)
+        is_study = bool(parsed.get("is_study_related", True))
+        reason = (parsed.get("reason") or "").strip()
+        return is_study, reason
+    except Exception as e:
+        print(f"[ai] study relevance check skipped: {e}")
+        return True, ""
+
+
+def ensure_study_related_note(note: dict, client=None):
+    """Raise HTTP 400 if a recorded note is flagged as non-study / accidental content."""
+    if note.get("is_study_related") is False:
+        reason = note.get("study_relevance_reason") or "This recording does not appear to contain academic or study material."
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not study-related: {reason} Please record or upload study material, or delete this accidental recording."
+        )
+
+    if note.get("file_type") == "audio_lecture" and "is_study_related" not in note:
+        is_study, reason = classify_study_relevance(note.get("extracted_text", ""), client=client)
+        try:
+            notes_collection.update_one(
+                {"_id": note["_id"]},
+                {"$set": {"is_study_related": is_study, "study_relevance_reason": reason}},
+            )
+        except Exception:
+            pass
+        if not is_study:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Not study-related: {reason or 'This recording does not appear to contain study material.'} Please delete this accidental recording or record lecture content."
+            )
+
+
 def get_note_text(note: dict) -> str:
     """
     Return the best available text for a note.
@@ -283,13 +349,33 @@ async def tutor_chat(req: TutorRequest, user_id: str = Depends(get_current_user_
         try:
             note = notes_collection.find_one({"_id": ObjectId(req.note_id), **user_query}) or notes_collection.find_one({"_id": ObjectId(req.note_id)})
             if note:
-                raw_txt = (note.get("extracted_text") or "").strip()
-                if raw_txt and raw_txt != "__EXTRACTING__":
-                    unit_label = f"Unit: {note.get('unit_code', 'General')} | Topic: {note.get('title', 'Study Notes')}"
-                    trimmed = prepare_note_text_for_ai(raw_txt, max_chars=3500)
-                    context_text = f"--- ACTIVE COURSE MATERIAL ({unit_label}) ---\n{trimmed}\n---\n\n"
+                if note.get("is_study_related") is False:
+                    reason = note.get("study_relevance_reason") or "it was detected as accidental or casual non-study audio"
+                    missing_note_text_reason = (
+                        f"The selected recording '{note.get('title', 'Selected Note')}' is NOT study-related ({reason})."
+                    )
                 else:
-                    missing_note_text_reason = f"The note '{note.get('title', 'Selected Note')}' does not have extracted text available yet."
+                    raw_txt = (note.get("extracted_text") or "").strip()
+                    if raw_txt and raw_txt != "__EXTRACTING__":
+                        if note.get("file_type") == "audio_lecture" and "is_study_related" not in note:
+                            is_study, reason = classify_study_relevance(raw_txt, client=client)
+                            try:
+                                notes_collection.update_one(
+                                    {"_id": note["_id"]},
+                                    {"$set": {"is_study_related": is_study, "study_relevance_reason": reason}},
+                                )
+                            except Exception:
+                                pass
+                            if not is_study:
+                                missing_note_text_reason = (
+                                    f"The selected recording '{note.get('title', 'Selected Note')}' is NOT study-related ({reason or 'casual or accidental audio'})."
+                                )
+                        if not missing_note_text_reason:
+                            unit_label = f"Unit: {note.get('unit_code', 'General')} | Topic: {note.get('title', 'Study Notes')}"
+                            trimmed = prepare_note_text_for_ai(raw_txt, max_chars=3500)
+                            context_text = f"--- ACTIVE COURSE MATERIAL ({unit_label}) ---\n{trimmed}\n---\n\n"
+                    else:
+                        missing_note_text_reason = f"The note '{note.get('title', 'Selected Note')}' does not have extracted text available yet."
         except Exception:
             pass
 
@@ -332,10 +418,12 @@ async def tutor_chat(req: TutorRequest, user_id: str = Depends(get_current_user_
         "STRICT GROUNDING RULES:\n"
         "- Base your explanations, examples, analogies, exam questions, and answers STRICTLY on the ACTIVE COURSE MATERIAL below.\n"
         "- Do NOT fabricate syllabus facts, formulas, definitions, or course details not supported by the material. If something is missing from the notes, state that clearly.\n"
+        "- If the loaded material itself is clearly casual non-study chatter, mic-testing, or accidental speech rather than academic content, inform the student clearly that the recording does not appear to be study-related instead of inventing a lesson.\n"
         if context_text
         else (
             "STRICT ANTI-HALLUCINATION RULES (NO STUDY NOTES LOADED):\n"
             f"- {missing_note_text_reason or 'No study note is currently loaded for this chat.'}\n"
+            "- If the selected recording was flagged as NOT study-related, tell the student directly that this recording does not appear to be study-related and suggest deleting it or recording actual lecture material.\n"
             "- NEVER invent, assume, or hallucinate a random course, unit, or topic when the student has not explicitly named a specific subject.\n"
             "- If the student sends a generic request (such as 'simple analogy', 'quiz me', 'crash course', or 'explain this') without naming a specific concept or topic, DO NOT make up a subject. Politely inform them that no notes are loaded yet and ask them to upload/select a note or state the exact topic they want to learn.\n"
             "- Only answer directly if the student clearly named a specific topic or asked a self-contained question.\n"
@@ -577,6 +665,8 @@ async def generate_summary(req: GenerateRequest, user_id: str = Depends(get_curr
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
 
+    ensure_study_related_note(note)
+
     try:
         return build_and_cache_summary(note, user_id)
     except Exception as e:
@@ -589,6 +679,8 @@ async def generate_quiz(req: QuizRequest, user_id: str = Depends(get_current_use
     note = notes_collection.find_one({"_id": ObjectId(req.note_id), **user_query})
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
+
+    ensure_study_related_note(note, client=client)
 
     raw_note_text = get_note_text(note)
     note_text = prepare_note_text_for_ai(raw_note_text, max_chars=6000)
@@ -656,9 +748,12 @@ class StudyPlanRequest(BaseModel):
 async def generate_flashcards(req: GenerateRequest, user_id: str = Depends(get_current_user_id)):
     """Generate 10 Q&A flashcards from a note."""
     client = get_grok_client()
-    note = notes_collection.find_one({"_id": ObjectId(req.note_id), "user_id": ObjectId(user_id)})
+    user_query = {"$or": [{"user_id": ObjectId(user_id)}, {"user_id": user_id}]} if ObjectId.is_valid(user_id) else {"user_id": user_id}
+    note = notes_collection.find_one({"_id": ObjectId(req.note_id), **user_query})
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
+
+    ensure_study_related_note(note, client=client)
 
     raw_note_text = get_note_text(note)
     note_text = prepare_note_text_for_ai(raw_note_text, max_chars=5000)
@@ -692,9 +787,12 @@ async def generate_flashcards(req: GenerateRequest, user_id: str = Depends(get_c
 async def generate_mindmap(req: GenerateRequest, user_id: str = Depends(get_current_user_id)):
     """Generate a mind map (nested concept tree) from a note."""
     client = get_grok_client()
-    note = notes_collection.find_one({"_id": ObjectId(req.note_id), "user_id": ObjectId(user_id)})
+    user_query = {"$or": [{"user_id": ObjectId(user_id)}, {"user_id": user_id}]} if ObjectId.is_valid(user_id) else {"user_id": user_id}
+    note = notes_collection.find_one({"_id": ObjectId(req.note_id), **user_query})
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
+
+    ensure_study_related_note(note, client=client)
 
     raw_note_text = get_note_text(note)
     note_text = prepare_note_text_for_ai(raw_note_text, max_chars=5000)
@@ -1074,6 +1172,7 @@ async def transcribe_lecture_audio(
 
     # Attempt transcription using Groq Whisper model, falling back to live Speech-to-Text notes
     extracted_text = ""
+    client = None
     try:
         client = get_grok_client()
         with open(file_path, "rb") as audio_file:
@@ -1092,6 +1191,8 @@ async def transcribe_lecture_audio(
             or "Audio lecture recorded. You can listen to the original audio recording using the player above."
         )
 
+    is_study_related, study_relevance_reason = classify_study_relevance(extracted_text, client=client)
+
     # Create note record in MongoDB
     user_obj_id = ObjectId(user_id) if ObjectId.is_valid(user_id) else user_id
     note_doc = {
@@ -1103,6 +1204,8 @@ async def transcribe_lecture_audio(
         "file_url": f"/uploads/audio/{clean_filename}",
         "file_path": file_path,
         "extracted_text": extracted_text,
+        "is_study_related": is_study_related,
+        "study_relevance_reason": study_relevance_reason,
         "created_at": datetime.utcnow(),
         "file_type": "audio_lecture"
     }

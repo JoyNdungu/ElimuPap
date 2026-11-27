@@ -738,6 +738,15 @@ export default function NotesPage() {
                               <span className={`text-[10px] font-mono ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
                                 {note.unit_code || 'General'}
                               </span>
+                              {note.is_study_related === false && (
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                                  isDark
+                                    ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                                    : 'bg-rose-50 text-rose-700 border-rose-200'
+                                }`}>
+                                  Non-Study
+                                </span>
+                              )}
                               {note.isOfflinePending && (
                                 <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
                                   isDark

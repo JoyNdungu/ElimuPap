@@ -12,6 +12,29 @@ const STOP_WORDS = new Set([
   'these', 'those', 'more', 'most', 'such', 'only', 'other', 'about', 'between',
 ]);
 
+export function detectNonStudyNote(note) {
+  if (!note) return null;
+  if (note.is_study_related === false) {
+    return note.study_relevance_reason || 'This recording does not appear to contain study material.';
+  }
+  if (note.file_type === 'audio_lecture') {
+    const raw = (note.extracted_text || '').trim();
+    const placeholder = 'Audio lecture recorded. You can listen to the original audio recording using the player above.';
+    if (!raw || raw === placeholder) {
+      return 'No spoken study content was detected in this recording.';
+    }
+    const words = raw.split(/\s+/).filter((w) => /[a-z0-9]/i.test(w));
+    if (words.length < 4) {
+      return 'The recording is too short or accidental to contain study material.';
+    }
+    const low = raw.toLowerCase();
+    if (/^(hello|hi|hey|test|testing|mic check|check check|one two three|1 2 3|\s|,|\.)+$/.test(low)) {
+      return 'This looks like a quick mic test rather than a lecture recording.';
+    }
+  }
+  return null;
+}
+
 function splitSentences(text) {
   return (text || '')
     .replace(/\r/g, '\n')

@@ -5,7 +5,7 @@ import api from '../api/axios';
 import { getPendingUploadById } from '../utils/offlineUploads';
 import { extractTextFromFileClient } from '../utils/offlineExtractor';
 import { getCachedResponse } from '../utils/offlineCache';
-import { generateOfflineQuiz } from '../utils/offlineAiTools';
+import { detectNonStudyNote, generateOfflineQuiz } from '../utils/offlineAiTools';
 
 export default function QuizPage() {
   const location = useLocation();
@@ -44,11 +44,21 @@ export default function QuizPage() {
       } else {
         noteObj = getCachedResponse('get', `/notes/${noteId}`, null);
       }
-      return noteObj ? generateOfflineQuiz(noteObj, numQuestions) : null;
+      if (!noteObj) return null;
+      const nonStudyReason = detectNonStudyNote(noteObj);
+      if (nonStudyReason) {
+        return { __nonStudyError: `Not study-related: ${nonStudyReason}` };
+      }
+      return generateOfflineQuiz(noteObj, numQuestions);
     };
 
     if (noteId?.startsWith('offline_upload_') || (typeof navigator !== 'undefined' && !navigator.onLine)) {
       const offlineQuiz = await buildOfflineFallback();
+      if (offlineQuiz?.__nonStudyError) {
+        setError(offlineQuiz.__nonStudyError);
+        setLoading(false);
+        return;
+      }
       if (offlineQuiz) {
         setQuizData(offlineQuiz);
         setLoading(false);
@@ -69,6 +79,11 @@ export default function QuizPage() {
     } catch (err) {
       if (!err?.response || (typeof navigator !== 'undefined' && !navigator.onLine)) {
         const offlineQuiz = await buildOfflineFallback();
+        if (offlineQuiz?.__nonStudyError) {
+          setError(offlineQuiz.__nonStudyError);
+          setLoading(false);
+          return;
+        }
         if (offlineQuiz) {
           setQuizData(offlineQuiz);
           setLoading(false);
