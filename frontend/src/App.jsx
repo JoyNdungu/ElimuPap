@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import OfflineBanner from './components/OfflineBanner';
+import PomodoroTimer from './components/PomodoroTimer';
 
 import LandingPage      from './pages/LandingPage';
 import LoginPage        from './pages/LoginPage';
@@ -18,12 +19,21 @@ import QuizPage       from './pages/QuizPage';
 import StudyPlanPage  from './pages/StudyPlanPage';
 import ProfilePage    from './pages/ProfilePage';
 
+function GlobalStudyTimer() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const publicPaths = ['/', '/login', '/register'];
+  if (!user || publicPaths.includes(location.pathname)) return null;
+  return <PomodoroTimer />;
+}
+
 export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
           <OfflineBanner />
+          <GlobalStudyTimer />
           <Routes>
           {/* ── Public routes ── */}
           <Route path="/"         element={<LandingPage />} />

@@ -1026,6 +1026,7 @@ async def transcribe_lecture_audio(
     file: UploadFile = File(...),
     title: Optional[str] = Form("Lecture Recording"),
     unit_code: Optional[str] = Form("GENERAL"),
+    live_transcript: Optional[str] = Form(""),
     token: str = Depends(oauth2_scheme)
 ):
     user_id = get_current_user_id(token)
@@ -1042,7 +1043,7 @@ async def transcribe_lecture_audio(
     finally:
         file.file.close()
 
-    # Attempt transcription using Groq Whisper model
+    # Attempt transcription using Groq Whisper model, falling back to live Speech-to-Text notes
     extracted_text = ""
     try:
         client = get_grok_client()
@@ -1051,10 +1052,16 @@ async def transcribe_lecture_audio(
                 file=(clean_filename, audio_file.read()),
                 model="whisper-large-v3"
             )
-            extracted_text = getattr(transcription, "text", str(transcription))
+            extracted_text = getattr(transcription, "text", str(transcription)) or ""
     except Exception as e:
         print(f"Audio transcription note: {e}")
-        extracted_text = "Audio lecture recorded. You can listen to the original audio recording using the player above."
+        extracted_text = ""
+
+    if not extracted_text.strip():
+        extracted_text = (
+            (live_transcript or "").strip()
+            or "Audio lecture recorded. You can listen to the original audio recording using the player above."
+        )
 
     # Create note record in MongoDB
     user_obj_id = ObjectId(user_id) if ObjectId.is_valid(user_id) else user_id

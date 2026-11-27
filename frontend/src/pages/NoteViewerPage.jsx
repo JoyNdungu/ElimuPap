@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useTheme } from '../context/ThemeContext';
 import { getOfflineFileUrl, FILES_CACHE_NAME } from '../utils/offlineSync';
+import { getPendingUploadById } from '../utils/offlineUploads';
 import api from '../api/axios';
 
 const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
@@ -268,6 +269,50 @@ export default function NoteViewerPage() {
   const [mobileTab, setMobileTab] = useState('doc'); // 'doc' | 'tools'
 
   useEffect(() => {
+    let active = true;
+    let localObjectUrl = null;
+
+    if (noteId?.startsWith('offline_upload_')) {
+      (async () => {
+        const pending = await getPendingUploadById(noteId);
+        if (!active) return;
+        if (!pending) {
+          setError('Offline upload not found (it may have already synced — check Library).');
+          setLoading(false);
+          return;
+        }
+
+        let textContent = pending.live_transcript || '';
+        if (['txt', 'md'].includes(pending.file_type) && pending.file) {
+          try {
+            textContent = await pending.file.text();
+          } catch {}
+        }
+
+        setNote({
+          id: pending.id,
+          title: pending.title,
+          unit_code: pending.unit_code,
+          file_type: pending.file_type,
+          extracted_text: textContent,
+          isOfflinePending: true,
+        });
+
+        if (pending.file) {
+          localObjectUrl = URL.createObjectURL(pending.file);
+          if (pending.file_type === 'pdf') setOfflinePdfBlob(localObjectUrl);
+          else if (pending.file_type === 'docx') setOfflineDocxBlob(localObjectUrl);
+          else if (pending.file_type === 'audio_lecture') setOfflineAudioBlob(localObjectUrl);
+          else if (pending.file_type === 'ocr_image') setOfflineImageUrl(localObjectUrl);
+        }
+        setLoading(false);
+      })();
+      return () => {
+        active = false;
+        if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
+      };
+    }
+
     fetchNote();
     const token = localStorage.getItem('elimupap_token');
     api.post('/progress/activity', { type: 'note_opened', note_id: noteId }, {
@@ -278,7 +323,10 @@ export default function NoteViewerPage() {
         headers: { Authorization: `Bearer ${token}` }
       }).catch(() => {});
     }, 60000);
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [noteId]);
 
   const fetchNote = async () => {
@@ -337,12 +385,14 @@ export default function NoteViewerPage() {
   const isAudio        = note?.file_type === 'audio_lecture';
   const rawAudioUrl    = note?.file_url ? (note.file_url.startsWith('http') ? note.file_url : `${BASE}${note.file_url}`) : null;
   const rawPdfViewUrl  = isNativePdf ? pdfUrl : convertedPdfUrl;
-  const hasPdfVersion  = isNativePdf ? !!pdfUrl : !!convertedPdfUrl;
 
   const [offlinePdfBlob, setOfflinePdfBlob]     = useState(null);
   const [offlineDocxBlob, setOfflineDocxBlob]   = useState(null);
   const [offlineAudioBlob, setOfflineAudioBlob] = useState(null);
+  const [offlineImageUrl, setOfflineImageUrl]   = useState(null);
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+
+  const hasPdfVersion = isNativePdf ? Boolean(pdfUrl || offlinePdfBlob) : Boolean(convertedPdfUrl);
 
   useEffect(() => {
     const onOnline = () => setIsOffline(false);
@@ -356,6 +406,7 @@ export default function NoteViewerPage() {
   }, []);
 
   useEffect(() => {
+    if (note?.isOfflinePending) return undefined;
     let active = true;
     const createdUrls = [];
 
@@ -386,6 +437,7 @@ export default function NoteViewerPage() {
     setOfflinePdfBlob(null);
     setOfflineDocxBlob(null);
     setOfflineAudioBlob(null);
+    setOfflineImageUrl(null);
 
     if (rawPdfViewUrl) resolveOrCache(rawPdfViewUrl, setOfflinePdfBlob);
     if (isDocx && fileUrl) resolveOrCache(fileUrl, setOfflineDocxBlob);
@@ -395,7 +447,7 @@ export default function NoteViewerPage() {
       active = false;
       createdUrls.forEach((u) => URL.revokeObjectURL(u));
     };
-  }, [rawPdfViewUrl, isDocx, fileUrl, isAudio, rawAudioUrl]);
+  }, [note?.isOfflinePending, rawPdfViewUrl, isDocx, fileUrl, isAudio, rawAudioUrl]);
 
   const pdfViewUrl = offlinePdfBlob || rawPdfViewUrl;
   const resolvedFileUrl = offlineDocxBlob || fileUrl;
@@ -449,13 +501,23 @@ export default function NoteViewerPage() {
     // 4. PPTX → slide-card layout from extracted text
     if (isPptx) {
       if (note?.extracted_text === '__EXTRACTING__') return <ExtractingSpinner />;
+      if (!note?.extracted_text && note?.isOfflinePending) {
+        return (
+          <FallbackText text="This presentation is saved offline and waiting to upload. Connect to the internet to extract its slides and unlock AI summaries & quizzes." />
+        );
+      }
       return <PptxViewer text={note?.extracted_text} />;
     }
 
-    // 5. Generic text fallback / Audio Player
+    // 5. Generic text fallback / Image Preview / Audio Player
     return (
       <div className="w-full h-full overflow-y-auto">
         <div className={`p-8 max-w-[800px] mx-auto ${isDark ? 'text-gray-200' : 'text-slate-800'}`}>
+          {note?.file_type === 'ocr_image' && offlineImageUrl && (
+            <div className="mb-6 rounded-2xl overflow-hidden border border-slate-700/40 shadow-sm">
+              <img src={offlineImageUrl} alt={note.title || 'Uploaded image'} className="w-full max-h-[70vh] object-contain bg-black/20" />
+            </div>
+          )}
           {isAudio && audioUrl && (
              <div className={`mb-8 rounded-3xl p-8 shadow-sm flex flex-col items-center justify-center border ${
                isDark ? 'bg-[#1F1F2A] border-white/5' : 'bg-white border-slate-200'
@@ -526,6 +588,13 @@ export default function NoteViewerPage() {
 
           {/* Actions badge */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            {note?.isOfflinePending && (
+              <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border ${
+                isDark ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
+                Pending Sync
+              </span>
+            )}
             {note?.file_type && (
               <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border ${
                 isDark ? 'bg-[#2563EB]/20 text-blue-300 border-[#2563EB]/30' : 'bg-blue-50 text-[#1D4ED8] border-blue-200'

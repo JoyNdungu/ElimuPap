@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
+import { enqueueOfflineUpload } from '../utils/offlineUploads';
 
 export default function UploadNotesPage() {
   const { isDark } = useTheme();
@@ -23,6 +24,8 @@ export default function UploadNotesPage() {
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+    'text/markdown',
     'image/jpeg',
     'image/png',
     'image/webp'
@@ -42,7 +45,7 @@ export default function UploadNotesPage() {
   }, []);
 
   const isValidFile = (f) =>
-    VALID_TYPES.includes(f.type) || /\.(pdf|docx|pptx|png|jpg|jpeg|webp)$/i.test(f.name);
+    VALID_TYPES.includes(f.type) || /\.(pdf|docx|pptx|txt|md|png|jpg|jpeg|webp)$/i.test(f.name);
 
   const addFiles = (incoming) => {
     const valid = Array.from(incoming).filter(isValidFile);
@@ -53,7 +56,7 @@ export default function UploadNotesPage() {
     if (hasLegacy) {
       setError(`Legacy formats (.doc, .ppt) are too old to be read by our AI. Please open them and "Save As" .docx, .pptx, or .pdf!`);
     } else if (invalid.length) {
-      setError(`${invalid.length} file(s) skipped — only PDF, DOCX, PPTX, or Image (JPEG/PNG) files are allowed.`);
+      setError(`${invalid.length} file(s) skipped — only PDF, DOCX, PPTX, TXT, or Image (JPEG/PNG) files are allowed.`);
     } else {
       setError('');
     }
@@ -85,15 +88,40 @@ export default function UploadNotesPage() {
     setError('');
 
     const token = localStorage.getItem('elimupap_token');
+    const isNavigatorOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    const queueFileOffline = async (file, endpoint, isImage) => {
+      const extMatch = file.name.match(/\.([^/.]+)$/);
+      const ext = isImage ? 'ocr_image' : (extMatch ? extMatch[1].toLowerCase() : 'doc');
+      await enqueueOfflineUpload({
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        filename: file.name,
+        fileType: ext,
+        mimeType: file.type,
+        unitCode: selectedUnit || 'GENERAL',
+        endpoint,
+        file,
+      });
+      return { name: file.name, ok: true, offlineQueued: true };
+    };
+
     const uploadPromises = files.map(async (file) => {
+      const isImage = /\.(png|jpg|jpeg|webp)$/i.test(file.name) || file.type.startsWith('image/');
+      const endpoint = isImage ? '/ai/ocr' : '/notes/upload';
+
+      if (isNavigatorOffline) {
+        try {
+          return await queueFileOffline(file, endpoint, isImage);
+        } catch (qErr) {
+          return { name: file.name, ok: false, error: qErr?.message || 'Failed to save offline' };
+        }
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
       formData.append('unit_code', selectedUnit);
       formData.append('topic', '');
-
-      const isImage = /\.(png|jpg|jpeg|webp)$/i.test(file.name) || file.type.startsWith('image/');
-      const endpoint = isImage ? '/ai/ocr' : '/notes/upload';
 
       try {
         await api.post(endpoint, formData, {
@@ -104,6 +132,13 @@ export default function UploadNotesPage() {
         });
         return { name: file.name, ok: true };
       } catch (err) {
+        if (!err?.response) {
+          try {
+            return await queueFileOffline(file, endpoint, isImage);
+          } catch (qErr) {
+            return { name: file.name, ok: false, error: qErr?.message || 'Offline save failed' };
+          }
+        }
         const msg = err?.response?.data?.detail || err.message || 'Upload failed';
         return { name: file.name, ok: false, error: typeof msg === 'string' ? msg : JSON.stringify(msg) };
       }
@@ -121,6 +156,7 @@ export default function UploadNotesPage() {
 
 
   const successCount = uploadResults.filter(r => r.ok).length;
+  const offlineCount = uploadResults.filter(r => r.offlineQueued).length;
   const failCount = uploadResults.filter(r => !r.ok).length;
   const allDone = uploadResults.length > 0;
 
@@ -165,7 +201,7 @@ export default function UploadNotesPage() {
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".pdf,.docx,.pptx"
+                accept=".pdf,.docx,.pptx,.txt,.md,.png,.jpg,.jpeg,.webp"
                 className="hidden"
                 onChange={handleFileInput}
               />
@@ -186,7 +222,7 @@ export default function UploadNotesPage() {
               <p className={`text-[14px] font-medium mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {isDragging ? 'Drop files here' : 'Click to upload or drag and drop'}
               </p>
-              <p className="text-[12px] text-slate-500">PDF, DOCX, or PPTX — select as many as you like</p>
+              <p className="text-[12px] text-slate-500">PDF, DOCX, PPTX, TXT, or Images — works online &amp; offline</p>
             </div>
 
             {error && (
@@ -224,11 +260,14 @@ export default function UploadNotesPage() {
                         {/* Status indicator */}
                         {result && (
                           result.ok ? (
-                            <span className={`flex items-center gap-1 text-[11px] font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                            <span className={`flex items-center gap-1 text-[11px] font-medium ${result.offlineQueued
+                              ? (isDark ? 'text-amber-400' : 'text-amber-600')
+                              : (isDark ? 'text-emerald-400' : 'text-emerald-600')
+                              }`}>
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                               </svg>
-                              Done
+                              {result.offlineQueued ? 'Saved Offline' : 'Done'}
                             </span>
                           ) : (
                             <span className={`text-[11px] font-medium ${isDark ? 'text-red-400' : 'text-red-600'}`} title={result.error}>Failed</span>
@@ -293,7 +332,9 @@ export default function UploadNotesPage() {
                   }
                 </svg>
                 {failCount === 0
-                  ? `All ${successCount} file${successCount > 1 ? 's' : ''} uploaded successfully! Redirecting…`
+                  ? offlineCount > 0
+                    ? `Saved ${offlineCount} file${offlineCount > 1 ? 's' : ''} offline! Available in Library now and will sync automatically when online.`
+                    : `All ${successCount} file${successCount > 1 ? 's' : ''} uploaded successfully! Redirecting…`
                   : `${successCount} uploaded, ${failCount} failed. Check the list above.`
                 }
               </div>

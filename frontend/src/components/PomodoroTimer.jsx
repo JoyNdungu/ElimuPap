@@ -90,21 +90,21 @@ export default function PomodoroTimer() {
       const ctx = getAudioContext();
       if (!ctx) return;
 
-      // Play a clear, pleasant multi-note chime sequence
-      const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
+      // Play two clear chime waves so alert is unmistakable on any page
+      const notes = [523.25, 659.25, 783.99, 1046.5, 659.25, 783.99, 1046.5];
       const baseTime = ctx.currentTime + 0.02;
 
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        const start = baseTime + idx * 0.18;
-        const duration = idx === notes.length - 1 ? 0.55 : 0.24;
+        const start = baseTime + idx * 0.17;
+        const duration = idx === notes.length - 1 ? 0.65 : 0.24;
 
         osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
         osc.frequency.setValueAtTime(freq, start);
 
         gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(0.28, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.32, start + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
         osc.connect(gain);
@@ -112,6 +112,10 @@ export default function PomodoroTimer() {
         osc.start(start);
         osc.stop(start + duration + 0.03);
       });
+
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]);
+      }
     } catch {
       // Ignore Web Audio errors on restricted devices
     }

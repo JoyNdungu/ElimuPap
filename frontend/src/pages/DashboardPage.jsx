@@ -6,7 +6,6 @@ import { useState, useRef, useEffect } from 'react';
 import api from '../api/axios';
 import { Search, Layers, Mic, FileAudio } from '../components/Icons';
 import GlobalSearchModal from '../components/GlobalSearchModal';
-import PomodoroTimer from '../components/PomodoroTimer';
 import ExamCountdownWidget from '../components/ExamCountdownWidget';
 import SpacedRepetitionModal from '../components/SpacedRepetitionModal';
 import AudioRecorderModal from '../components/AudioRecorderModal';
@@ -432,9 +431,6 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
-
-      {/* Floating Pomodoro Timer */}
-      <PomodoroTimer />
 
       {/* Global Modals */}
       <GlobalSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />

@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar';
 import AudioRecorderModal from '../components/AudioRecorderModal';
 import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
+import { getPendingUploads, removePendingUpload } from '../utils/offlineUploads';
 
 export default function NotesPage() {
   const { isDark } = useTheme();
@@ -11,6 +12,7 @@ export default function NotesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [units, setUnits] = useState([]);
   const [notes, setNotes] = useState([]);
+  const [pendingUploads, setPendingUploads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -28,8 +30,26 @@ export default function NotesPage() {
   const [deleteTarget, setDeleteTarget] = useState(null); // { type: 'note' | 'unit', id, title, code }
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const refreshPendingUploads = async () => {
+    const items = await getPendingUploads();
+    setPendingUploads(items);
+  };
+
   useEffect(() => {
     fetchData();
+    refreshPendingUploads();
+
+    const onUploadsUpdated = () => refreshPendingUploads();
+    const onUploadsSynced = () => {
+      refreshPendingUploads();
+      fetchData();
+    };
+    window.addEventListener('elimupap:uploads-updated', onUploadsUpdated);
+    window.addEventListener('elimupap:uploads-synced', onUploadsSynced);
+    return () => {
+      window.removeEventListener('elimupap:uploads-updated', onUploadsUpdated);
+      window.removeEventListener('elimupap:uploads-synced', onUploadsSynced);
+    };
   }, []);
 
   // Sync mediaFilter with URL if changed
@@ -99,6 +119,7 @@ export default function NotesPage() {
       type: 'note',
       id: note.id,
       title: note.title || 'this note',
+      isOfflinePending: Boolean(note.isOfflinePending),
     });
   };
 
@@ -129,6 +150,19 @@ export default function NotesPage() {
       return;
     }
 
+    if (deleteTarget.isOfflinePending) {
+      try {
+        await removePendingUpload(deleteTarget.id);
+        setPendingUploads(prev => prev.filter(p => p.id !== deleteTarget.id));
+        setDeleteTarget(null);
+      } catch {
+        setError('Failed to remove queued offline note.');
+      } finally {
+        setIsDeleting(false);
+      }
+      return;
+    }
+
     const previousNotes = [...notes];
     setNotes(notes.filter(n => n.id !== deleteTarget.id));
     try {
@@ -144,10 +178,12 @@ export default function NotesPage() {
     }
   };
 
+  const allNotes = useMemo(() => [...pendingUploads, ...notes], [pendingUploads, notes]);
+
   // Compile combined units (including auto-discovered ones from notes like GENERAL)
   const combinedUnits = useMemo(() => {
     const list = [...units];
-    const noteCodes = [...new Set(notes.map(n => (n.unit_code || 'GENERAL').toUpperCase()))];
+    const noteCodes = [...new Set(allNotes.map(n => (n.unit_code || 'GENERAL').toUpperCase()))];
     noteCodes.forEach(code => {
       if (!list.some(u => u.unit_code?.toUpperCase() === code)) {
         list.push({
@@ -159,15 +195,15 @@ export default function NotesPage() {
       }
     });
     return list;
-  }, [units, notes]);
+  }, [units, allNotes]);
 
   // Total counts
-  const totalAudioCount = useMemo(() => notes.filter(n => n.file_type === 'audio_lecture').length, [notes]);
-  const totalDocsCount = useMemo(() => notes.filter(n => n.file_type !== 'audio_lecture').length, [notes]);
+  const totalAudioCount = useMemo(() => allNotes.filter(n => n.file_type === 'audio_lecture').length, [allNotes]);
+  const totalDocsCount = useMemo(() => allNotes.filter(n => n.file_type !== 'audio_lecture').length, [allNotes]);
 
   // Filter notes by unit and media type
   const displayedNotes = useMemo(() => {
-    let result = notes;
+    let result = allNotes;
     if (activeUnitCode && activeUnitCode !== 'ALL') {
       result = result.filter(n => (n.unit_code || 'GENERAL').toUpperCase() === activeUnitCode.toUpperCase());
     }
@@ -177,7 +213,7 @@ export default function NotesPage() {
       result = result.filter(n => n.file_type !== 'audio_lecture');
     }
     return result;
-  }, [notes, activeUnitCode, mediaFilter]);
+  }, [allNotes, activeUnitCode, mediaFilter]);
 
   const activeUnitObj = activeUnitCode === 'ALL'
     ? { unit_name: 'All Library Materials', unit_code: 'ALL' }
@@ -700,6 +736,15 @@ export default function NotesPage() {
                               <span className={`text-[10px] font-mono ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
                                 {note.unit_code || 'General'}
                               </span>
+                              {note.isOfflinePending && (
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                                  isDark
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  Pending Sync
+                                </span>
+                              )}
                             </div>
                             <h4
                               className={`text-[14px] font-semibold leading-snug line-clamp-2 transition-colors ${

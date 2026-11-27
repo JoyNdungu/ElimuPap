@@ -112,6 +112,13 @@ def extract_text_from_file(file_path: str, ext: str) -> str:
         except Exception as e:
             extracted_text = f"Could not read this presentation.\n\nError: {e}"
 
+    elif ext in ("txt", "md"):
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                extracted_text = f.read()
+        except Exception as e:
+            extracted_text = f"Could not read this text file.\n\nError: {e}"
+
     return extracted_text.strip()
 
 
