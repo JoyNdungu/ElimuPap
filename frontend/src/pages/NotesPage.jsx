@@ -139,6 +139,7 @@ export default function NotesPage() {
         await api.delete(`/units/${deleteTarget.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        window.dispatchEvent(new CustomEvent('elimupap:data-changed'));
         setDeleteTarget(null);
       } catch (err) {
         setUnits(previousUnits);
@@ -169,6 +170,7 @@ export default function NotesPage() {
       await api.delete(`/notes/${deleteTarget.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      window.dispatchEvent(new CustomEvent('elimupap:data-changed'));
       setDeleteTarget(null);
     } catch (err) {
       setNotes(previousNotes);

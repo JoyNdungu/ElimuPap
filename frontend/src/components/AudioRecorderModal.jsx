@@ -233,6 +233,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
         const res = await api.post('/notes/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        window.dispatchEvent(new CustomEvent('elimupap:data-changed'));
         onClose();
         navigate(`/notes/${res.data.id}`);
       } catch (err) {
@@ -296,6 +297,7 @@ export default function AudioRecorderModal({ isOpen, onClose }) {
       const res = await api.post('/ai/transcribe-audio', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      window.dispatchEvent(new CustomEvent('elimupap:data-changed'));
       onClose();
       navigate(`/notes/${res.data.id}`);
     } catch (err) {

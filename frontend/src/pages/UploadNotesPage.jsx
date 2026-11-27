@@ -153,6 +153,9 @@ export default function UploadNotesPage() {
     setIsUploading(false);
 
     if (results.every(r => r.ok)) {
+      if (results.some(r => !r.offlineQueued)) {
+        window.dispatchEvent(new CustomEvent('elimupap:data-changed'));
+      }
       setTimeout(() => navigate('/notes'), 1500);
     }
   };

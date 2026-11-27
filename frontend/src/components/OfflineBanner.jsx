@@ -19,7 +19,18 @@ export default function OfflineBanner() {
   }, []);
 
   useEffect(() => {
-    const syncPending = async () => {
+    const runAutoSync = (force = false) => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+      if (!localStorage.getItem('elimupap_token')) return;
+
+      const meta = getOfflineMeta();
+      const stale = !meta?.syncedAt || (Date.now() - new Date(meta.syncedAt).getTime()) > 3 * 60 * 1000;
+      if (force || stale) {
+        syncAllForOffline({ includeFiles: true }).catch(() => {});
+      }
+    };
+
+    const syncPending = async (autoPullBundle = false) => {
       if (!navigator.onLine) {
         await refreshCounts();
         return;
@@ -36,12 +47,15 @@ export default function OfflineBanner() {
       if (total > 0) {
         setSyncedNotice(total);
         setTimeout(() => setSyncedNotice(0), 5000);
+        runAutoSync(true);
+      } else if (autoPullBundle) {
+        runAutoSync(false);
       }
     };
 
     const handleOnline = () => {
       setIsOnline(true);
-      syncPending();
+      syncPending(true);
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -50,24 +64,29 @@ export default function OfflineBanner() {
     const handleQueueUpdate = () => {
       refreshCounts();
     };
+    const handleAuthOrDataChange = () => {
+      // Automatically pull fresh notes/units/summaries for offline use right after login or edits
+      setTimeout(() => runAutoSync(true), 800);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        syncPending(true);
+      }
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('elimupap:queue-updated', handleQueueUpdate);
     window.addEventListener('elimupap:uploads-updated', handleQueueUpdate);
+    window.addEventListener('elimupap:auth-changed', handleAuthOrDataChange);
+    window.addEventListener('elimupap:data-changed', handleAuthOrDataChange);
+    window.addEventListener('elimupap:uploads-synced', handleAuthOrDataChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Flush any pending offline activity/uploads & do a quiet background sync if stale (>15 min)
-    syncPending();
+    // Flush any pending offline activity/uploads & auto-sync offline bundle on startup
+    syncPending(false);
     if (navigator.onLine && localStorage.getItem('elimupap_token')) {
-      const meta = getOfflineMeta();
-      const stale = !meta?.syncedAt || (Date.now() - new Date(meta.syncedAt).getTime()) > 15 * 60 * 1000;
-      if (stale) {
-        setTimeout(() => {
-          if (navigator.onLine) {
-            syncAllForOffline({ includeFiles: true }).catch(() => {});
-          }
-        }, 2500);
-      }
+      setTimeout(() => runAutoSync(false), 1500);
     }
 
     return () => {
@@ -75,6 +94,10 @@ export default function OfflineBanner() {
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('elimupap:queue-updated', handleQueueUpdate);
       window.removeEventListener('elimupap:uploads-updated', handleQueueUpdate);
+      window.removeEventListener('elimupap:auth-changed', handleAuthOrDataChange);
+      window.removeEventListener('elimupap:data-changed', handleAuthOrDataChange);
+      window.removeEventListener('elimupap:uploads-synced', handleAuthOrDataChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [refreshCounts]);
 
