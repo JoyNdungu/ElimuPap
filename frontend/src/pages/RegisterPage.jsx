@@ -125,7 +125,7 @@ export default function RegisterPage() {
                 name="name"
                 type="text"
                 autoComplete="name"
-                placeholder="Jane Doe"
+                placeholder="Gathoni Ndung'u"
                 className={`w-full pl-10 pr-4 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:border-transparent transition-shadow ${errors.name ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#5B57FF]'}`}
                 style={{ backgroundColor: '#11111a', border: `1px solid ${errors.name ? '#ef4444' : '#2d2d4a'}` }}
                 value={fields.name}
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="name@example.com"
+                placeholder="gathoni.ndungu@example.com"
                 className={`w-full pl-10 pr-4 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:border-transparent transition-shadow ${errors.email ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#5B57FF]'}`}
                 style={{ backgroundColor: '#11111a', border: `1px solid ${errors.email ? '#ef4444' : '#2d2d4a'}` }}
                 value={fields.email}
@@ -182,7 +182,7 @@ export default function RegisterPage() {
                 id="reg-uni"
                 name="university"
                 type="text"
-                placeholder="University of Nairobi"
+                placeholder="Dekut"
                 className={`w-full pl-10 pr-4 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:border-transparent transition-shadow ${errors.university ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#5B57FF]'}`}
                 style={{ backgroundColor: '#11111a', border: `1px solid ${errors.university ? '#ef4444' : '#2d2d4a'}` }}
                 value={fields.university}

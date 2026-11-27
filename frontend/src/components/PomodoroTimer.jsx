@@ -304,13 +304,21 @@ export default function PomodoroTimer() {
   };
 
   if (minimized) {
+    const pillLabel = isRunning
+      ? (mode === 'shortBreak' || mode === 'longBreak' ? 'Break' : 'Focus')
+      : 'Study Timer';
+
     return (
       <button
         onClick={() => setMinimized(false)}
-        className="fixed bottom-24 lg:bottom-6 right-4 lg:right-6 z-40 bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-3 rounded-full shadow-lg flex items-center gap-2 border border-blue-500/30 transition transform hover:scale-105"
+        title="Open Study Timer"
+        aria-label={`Open Study Timer (${pillLabel} ${formatTime(timeLeft)})`}
+        className="fixed bottom-24 lg:bottom-6 right-4 lg:right-6 z-40 bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-3.5 py-2.5 rounded-full shadow-lg flex items-center gap-2 border border-blue-500/30 transition transform hover:scale-105"
       >
-        <Timer className={`w-5 h-5 ${isRunning ? 'animate-pulse' : ''}`} />
-        <span className="font-mono font-bold text-sm">{formatTime(timeLeft)}</span>
+        <Timer className={`w-4 h-4 shrink-0 ${isRunning ? 'animate-pulse' : ''}`} />
+        <span className="text-xs font-semibold tracking-tight whitespace-nowrap">{pillLabel}</span>
+        <span className="text-blue-200/70 text-xs">•</span>
+        <span className="font-mono font-bold text-xs sm:text-sm tabular-nums">{formatTime(timeLeft)}</span>
       </button>
     );
   }
