@@ -276,14 +276,19 @@ async def tutor_chat(req: TutorRequest, user_id: str = Depends(get_current_user_
     # Retrieve context if note_id is provided
     context_text = ""
     unit_label = ""
+    missing_note_text_reason = ""
     if req.note_id:
         user_query = {"$or": [{"user_id": ObjectId(user_id)}, {"user_id": user_id}]} if ObjectId.is_valid(user_id) else {"user_id": user_id}
         try:
             note = notes_collection.find_one({"_id": ObjectId(req.note_id), **user_query}) or notes_collection.find_one({"_id": ObjectId(req.note_id)})
-            if note and "extracted_text" in note:
-                unit_label = f"Unit: {note.get('unit_code', 'General')} | Topic: {note.get('title', 'Study Notes')}"
-                trimmed = prepare_note_text_for_ai(note["extracted_text"], max_chars=3500)
-                context_text = f"--- ACTIVE COURSE MATERIAL ({unit_label}) ---\n{trimmed}\n---\n\n"
+            if note:
+                raw_txt = (note.get("extracted_text") or "").strip()
+                if raw_txt and raw_txt != "__EXTRACTING__":
+                    unit_label = f"Unit: {note.get('unit_code', 'General')} | Topic: {note.get('title', 'Study Notes')}"
+                    trimmed = prepare_note_text_for_ai(raw_txt, max_chars=3500)
+                    context_text = f"--- ACTIVE COURSE MATERIAL ({unit_label}) ---\n{trimmed}\n---\n\n"
+                else:
+                    missing_note_text_reason = f"The note '{note.get('title', 'Selected Note')}' does not have extracted text available yet."
         except Exception:
             pass
 
@@ -322,9 +327,24 @@ async def tutor_chat(req: TutorRequest, user_id: str = Depends(get_current_user_
 
     mode_text = mode_instructions.get(req.mode, mode_instructions["tutor"])
 
+    grounding_rules = (
+        "STRICT GROUNDING RULES:\n"
+        "- Base your explanations, examples, analogies, exam questions, and answers STRICTLY on the ACTIVE COURSE MATERIAL below.\n"
+        "- Do NOT fabricate syllabus facts, formulas, definitions, or course details not supported by the material. If something is missing from the notes, state that clearly.\n"
+        if context_text
+        else (
+            "STRICT ANTI-HALLUCINATION RULES (NO STUDY NOTES LOADED):\n"
+            f"- {missing_note_text_reason or 'No study note is currently loaded for this chat.'}\n"
+            "- NEVER invent, assume, or hallucinate a random course, unit, or topic when the student has not explicitly named a specific subject.\n"
+            "- If the student sends a generic request (such as 'simple analogy', 'quiz me', 'crash course', or 'explain this') without naming a specific concept or topic, DO NOT make up a subject. Politely inform them that no notes are loaded yet and ask them to upload/select a note or state the exact topic they want to learn.\n"
+            "- Only answer directly if the student clearly named a specific topic or asked a self-contained question.\n"
+        )
+    )
+
     system_content = (
         "You are the ElimuPap AI Academic Tutor, an expert university study companion designed for Kenyan university students.\n"
         f"{mode_text}\n"
+        f"{grounding_rules}"
         "GUIDELINES:\n"
         "- Never write giant, unformatted walls of gray text.\n"
         "- Use clean Markdown (bold terms, bullet points, numbered lists, blockquotes).\n"

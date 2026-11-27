@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from '../components/Sidebar';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import api from '../api/axios';
 import ReactMarkdown from 'react-markdown';
 import { useTheme } from '../context/ThemeContext';
@@ -55,6 +55,7 @@ function TutorLeftPanel({
   setActiveTab,
   activeNoteId,
   onSelectNote,
+  onNotesLoaded,
   conversations,
   activeConvId,
   onSelectConversation,
@@ -72,11 +73,15 @@ function TutorLeftPanel({
     const token = localStorage.getItem('elimupap_token');
     api.get('/notes', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => {
-        setNotes(r.data || []);
-        const units = [...new Set((r.data || []).map(n => n.unit_code || 'Other'))];
+        const list = r.data || [];
+        setNotes(list);
+        onNotesLoaded?.(list.length);
+        const units = [...new Set(list.map(n => n.unit_code || 'Other'))];
         setOpenUnits(Object.fromEntries(units.map(u => [u, true])));
       })
-      .catch(() => {})
+      .catch(() => {
+        onNotesLoaded?.(0);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -399,6 +404,7 @@ export default function TutorPage() {
   const [input, setInput]           = useState('');
   const [isTyping, setIsTyping]     = useState(false);
   const [showTestMenu, setShowTestMenu] = useState(false);
+  const [notesCount, setNotesCount] = useState(null);
   const messagesEndRef = useRef(null);
   const testMenuRef    = useRef(null);
   const hasUserInteractedRef = useRef((initialSession?.messages?.length || 0) > 0);
@@ -708,33 +714,33 @@ export default function TutorPage() {
     handleSendPrompt(input);
   };
 
-  // Quick Action Starters for Empty State
-  const STARTER_CARDS = [
+  // Quick Action Starters (only triggered when a study note is loaded)
+  const STARTER_CARDS = activeNote ? [
     {
       icon: <Lightbulb className="w-5 h-5 text-amber-500" />,
       title: 'Simple Analogy',
       desc: 'Explain core concept in real-world everyday terms',
-      prompt: activeNote ? `Explain the core concept in "${activeNote.title}" using a colorful everyday analogy.` : 'Explain a challenging concept using a relatable everyday analogy.'
+      prompt: `Explain the core concept in "${activeNote.title}" using a relatable everyday analogy.`
     },
     {
       icon: <Target className="w-5 h-5 text-rose-500" />,
       title: 'Exam Drill',
       desc: 'What are the top exam questions professors ask?',
-      prompt: activeNote ? `What are the top 3 high-yield exam questions most likely to appear from "${activeNote.title}"?` : 'Give me 3 high-yield exam questions and model marking points for this topic.'
+      prompt: `What are the top 3 high-yield exam questions most likely to appear from "${activeNote.title}"?`
     },
     {
       icon: <Zap className="w-5 h-5 text-blue-500" />,
       title: '5-Minute Crash Course',
       desc: 'High-impact key takeaways & principles',
-      prompt: activeNote ? `Give me a high-yield 5-minute crash course on "${activeNote.title}".` : 'Give me a fast 5-minute crash course on the fundamentals.'
+      prompt: `Give me a high-yield 5-minute crash course on "${activeNote.title}".`
     },
     {
       icon: <HelpCircle className="w-5 h-5 text-emerald-500" />,
       title: 'Pop Quiz Challenge',
       desc: 'Test knowledge with a turn-by-turn trivia challenge',
-      prompt: activeNote ? `Start an interactive pop quiz on "${activeNote.title}". Ask me question #1!` : 'Start a rapid pop quiz to test my active recall. Give me the first question!'
+      prompt: `Start an interactive pop quiz on "${activeNote.title}". Ask me question #1!`
     }
-  ];
+  ] : [];
 
   return (
     <div
@@ -759,6 +765,7 @@ export default function TutorPage() {
             setActiveTab={setLeftTab}
             activeNoteId={activeNote?.id}
             onSelectNote={handleSelectNote}
+            onNotesLoaded={setNotesCount}
             conversations={conversations}
             activeConvId={activeConvId}
             onSelectConversation={handleSelectConversation}
@@ -801,6 +808,7 @@ export default function TutorPage() {
                   handleSelectNote(note);
                   setPanelOpen(false);
                 }}
+                onNotesLoaded={setNotesCount}
                 conversations={conversations}
                 activeConvId={activeConvId}
                 onSelectConversation={handleSelectConversation}
@@ -929,39 +937,82 @@ export default function TutorPage() {
                 <p className={`text-xs sm:text-sm max-w-md mb-8 ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
                   {activeNote
                     ? `I'm ready with "${activeNote.title}". Choose a starter prompt below or ask me any question directly.`
-                    : 'Select a note from the left panel for syllabus context, or pick an interactive study mode below to begin!'}
+                    : notesCount === 0
+                    ? 'No notes uploaded yet. Upload your lecture materials first so my answers stay strictly grounded in your coursework—or ask about a specific topic by name below.'
+                    : 'Select a note from Notes & Menu so I can tailor analogies, exam drills, and quizzes strictly to your material.'}
                 </p>
 
-                {/* 4 Interactive Starter Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl text-left">
-                  {STARTER_CARDS.map((card, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSendPrompt(card.prompt)}
-                      className={`p-4 rounded-2xl border transition-all group flex items-start gap-3.5 shadow-sm ${
-                        isDark
-                          ? 'bg-[#1F1F2A] border-white/10 hover:border-[#2563EB]/60 hover:bg-[#252536]'
-                          : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform ${
-                        isDark ? 'bg-white/5' : 'bg-[#f8fafc] border border-slate-200'
-                      }`}>
-                        {card.icon}
-                      </span>
-                      <div className="min-w-0">
-                        <h4 className={`text-xs font-bold transition-colors mb-0.5 ${
-                          isDark ? 'text-white group-hover:text-blue-400' : 'text-slate-900 group-hover:text-[#2563EB]'
+                {/* 4 Interactive Starter Cards (when a note is selected) or Grounding Prompt */}
+                {activeNote ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl text-left">
+                    {STARTER_CARDS.map((card, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSendPrompt(card.prompt)}
+                        className={`p-4 rounded-2xl border transition-all group flex items-start gap-3.5 shadow-sm ${
+                          isDark
+                            ? 'bg-[#1F1F2A] border-white/10 hover:border-[#2563EB]/60 hover:bg-[#252536]'
+                            : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform ${
+                          isDark ? 'bg-white/5' : 'bg-[#f8fafc] border border-slate-200'
                         }`}>
-                          {card.title}
-                        </h4>
-                        <p className={`text-[11px] leading-snug line-clamp-2 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                          {card.desc}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                          {card.icon}
+                        </span>
+                        <div className="min-w-0">
+                          <h4 className={`text-xs font-bold transition-colors mb-0.5 ${
+                            isDark ? 'text-white group-hover:text-blue-400' : 'text-slate-900 group-hover:text-[#2563EB]'
+                          }`}>
+                            {card.title}
+                          </h4>
+                          <p className={`text-[11px] leading-snug line-clamp-2 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                            {card.desc}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={`w-full max-w-md p-6 rounded-2xl border text-center space-y-4 ${
+                    isDark ? 'bg-[#1F1F2A] border-white/10' : 'bg-white border-slate-200 shadow-sm'
+                  }`}>
+                    <div className="w-11 h-11 rounded-xl bg-[#2563EB]/15 text-[#2563EB] flex items-center justify-center mx-auto">
+                      <BookOpen className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        {notesCount === 0 ? 'Upload Notes to Start Grounded Study' : 'Select a Study Note First'}
+                      </h3>
+                      <p className={`text-xs mt-1 leading-relaxed ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                        {notesCount === 0
+                          ? 'Uploading your PDFs, slides, or DOCX notes ensures the tutor never guesses or invents off-syllabus topics.'
+                          : 'Pick one of your uploaded notes from the menu to unlock note-grounded analogies, exam drills, and quizzes.'}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2.5 flex-wrap">
+                      {notesCount === 0 ? (
+                        <Link
+                          to="/notes/upload"
+                          className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#2563EB] hover:bg-[#1D4ED8] text-white transition shadow-sm"
+                        >
+                          Upload Notes / PPT
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLeftTab('notes');
+                            setPanelOpen(true);
+                          }}
+                          className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#2563EB] hover:bg-[#1D4ED8] text-white transition shadow-sm"
+                        >
+                          Choose a Note
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1142,7 +1193,7 @@ export default function TutorPage() {
                 </button>
 
                 {showTestMenu && (
-                  <div className={`absolute bottom-full left-0 mb-3 w-48 rounded-2xl py-2 shadow-2xl z-30 border animate-slide-up ${
+                  <div className={`absolute bottom-full left-0 mb-3 w-52 rounded-2xl py-2 shadow-2xl z-30 border animate-slide-up ${
                     isDark ? 'bg-[#1F1F2A] border-white/10' : 'bg-white border-slate-200'
                   }`}>
                     <p className={`text-[10px] font-bold uppercase tracking-widest px-3 pb-2 border-b ${
@@ -1150,27 +1201,46 @@ export default function TutorPage() {
                     }`}>
                       Interactive Formats:
                     </p>
-                    {[
-                      { icon: <FileText className="w-3.5 h-3.5 text-blue-500" />, label: 'Practice Questions', prompt: 'Generate 3 exam practice questions based on this material.' },
-                      { icon: <HelpCircle className="w-3.5 h-3.5 text-emerald-500" />, label: 'Quiz Game', prompt: 'Turn this into an interactive trivia quiz. Ask me question 1!' },
-                      { icon: <Layers className="w-3.5 h-3.5 text-purple-500" />, label: 'Flashcards', prompt: 'Extract 4 high-yield flashcard concepts (Front/Back) from this material.' },
-                      { icon: <Lightbulb className="w-3.5 h-3.5 text-amber-500" />, label: 'Real Analogy', prompt: 'Give me a vivid, funny real-world analogy to help me remember this.' }
-                    ].map(item => (
-                      <button
-                        key={item.label}
-                        type="button"
-                        onClick={() => {
-                          setShowTestMenu(false);
-                          handleSendPrompt(item.prompt);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-xs transition flex items-center gap-2 ${
-                          isDark ? 'text-gray-300 hover:text-white hover:bg-white/5' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className="flex-shrink-0">{item.icon}</span>
-                        <span>{item.label}</span>
-                      </button>
-                    ))}
+                    {!activeNote ? (
+                      <div className="px-3 py-2.5 space-y-2">
+                        <p className={`text-[11px] leading-relaxed ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
+                          Select a note first so prompts stay grounded in your coursework.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowTestMenu(false);
+                            setLeftTab('notes');
+                            setPanelOpen(true);
+                          }}
+                          className="w-full py-1.5 rounded-lg text-[11px] font-semibold bg-[#2563EB] text-white hover:bg-[#1D4ED8] transition"
+                        >
+                          Select a Note
+                        </button>
+                      </div>
+                    ) : (
+                      [
+                        { icon: <FileText className="w-3.5 h-3.5 text-blue-500" />, label: 'Practice Questions', prompt: `Generate 3 exam practice questions strictly from "${activeNote.title}".` },
+                        { icon: <HelpCircle className="w-3.5 h-3.5 text-emerald-500" />, label: 'Quiz Game', prompt: `Turn "${activeNote.title}" into an interactive trivia quiz. Ask me question 1!` },
+                        { icon: <Layers className="w-3.5 h-3.5 text-purple-500" />, label: 'Flashcards', prompt: `Extract 4 high-yield flashcard concepts (Front/Back) from "${activeNote.title}".` },
+                        { icon: <Lightbulb className="w-3.5 h-3.5 text-amber-500" />, label: 'Real Analogy', prompt: `Give me a clear real-world analogy to explain the main concept in "${activeNote.title}".` }
+                      ].map(item => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => {
+                            setShowTestMenu(false);
+                            handleSendPrompt(item.prompt);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-xs transition flex items-center gap-2 ${
+                            isDark ? 'text-gray-300 hover:text-white hover:bg-white/5' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="flex-shrink-0">{item.icon}</span>
+                          <span>{item.label}</span>
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -1187,7 +1257,7 @@ export default function TutorPage() {
                     ? 'Type your answer or type "Next question"…'
                     : activeNote
                     ? `Ask anything about "${activeNote.title}"…`
-                    : 'Ask anything or choose a study mode above…'
+                    : 'Type a specific topic or question (or select a note first)…'
                 }
                 value={input}
                 onChange={e => setInput(e.target.value)}
