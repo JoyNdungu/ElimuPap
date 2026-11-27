@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import api from '../api/axios';
+import { getPendingUploadById } from '../utils/offlineUploads';
+import { extractTextFromFileClient } from '../utils/offlineExtractor';
+import { getCachedResponse } from '../utils/offlineCache';
+import { generateOfflineQuiz } from '../utils/offlineAiTools';
 
 export default function QuizPage() {
   const location = useLocation();
@@ -25,6 +29,33 @@ export default function QuizPage() {
     setLoading(true);
     setError(null);
     setQuizData(null);
+
+    const buildOfflineFallback = async () => {
+      let noteObj = null;
+      if (noteId?.startsWith('offline_upload_')) {
+        const pending = await getPendingUploadById(noteId);
+        if (pending) {
+          let text = pending.extracted_text || pending.live_transcript || '';
+          if (!text && pending.file) {
+            text = await extractTextFromFileClient(pending.file);
+          }
+          noteObj = { ...pending, extracted_text: text };
+        }
+      } else {
+        noteObj = getCachedResponse('get', `/notes/${noteId}`, null);
+      }
+      return noteObj ? generateOfflineQuiz(noteObj, numQuestions) : null;
+    };
+
+    if (noteId?.startsWith('offline_upload_') || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      const offlineQuiz = await buildOfflineFallback();
+      if (offlineQuiz) {
+        setQuizData(offlineQuiz);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       const token = localStorage.getItem('elimupap_token');
       const response = await api.post('/ai/quiz', {
@@ -36,6 +67,14 @@ export default function QuizPage() {
       });
       setQuizData(response.data);
     } catch (err) {
+      if (!err?.response || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        const offlineQuiz = await buildOfflineFallback();
+        if (offlineQuiz) {
+          setQuizData(offlineQuiz);
+          setLoading(false);
+          return;
+        }
+      }
       console.error("Failed to fetch quiz:", err);
       setError(err.response?.data?.detail || "Failed to generate quiz. The note might not contain extractable text.");
     } finally {

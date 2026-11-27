@@ -3,6 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
+import { getPendingUploadById } from '../utils/offlineUploads';
+import { extractTextFromFileClient } from '../utils/offlineExtractor';
+import { getCachedResponse, saveCachedResponse } from '../utils/offlineCache';
+import { generateOfflineSummary } from '../utils/offlineAiTools';
 
 export default function SummaryPage() {
   const { isDark } = useTheme();
@@ -14,15 +18,59 @@ export default function SummaryPage() {
   const [activeTab, setActiveTab] = useState('sections'); // 'sections', 'overview', 'exam', 'definitions'
   const [copied, setCopied] = useState(false);
 
+  const buildOfflineSummaryFallback = async () => {
+    const cachedSummary = getCachedResponse('post', '/ai/summary', { note_id: noteId });
+    if (cachedSummary) return cachedSummary;
+
+    let noteObj = null;
+    if (noteId?.startsWith('offline_upload_')) {
+      const pending = await getPendingUploadById(noteId);
+      if (pending) {
+        let text = pending.extracted_text || pending.live_transcript || '';
+        if (!text && pending.file) {
+          text = await extractTextFromFileClient(pending.file);
+        }
+        noteObj = { ...pending, extracted_text: text };
+      }
+    } else {
+      noteObj = getCachedResponse('get', `/notes/${noteId}`, null);
+    }
+
+    if (!noteObj) {
+      noteObj = { id: noteId, title: 'Study Note', extracted_text: '' };
+    }
+    const generated = generateOfflineSummary(noteObj);
+    saveCachedResponse('post', '/ai/summary', { note_id: noteId }, generated);
+    return generated;
+  };
+
   const fetchSummary = async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
+
+    if (noteId?.startsWith('offline_upload_') || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      const offlineSummary = await buildOfflineSummaryFallback();
+      if (offlineSummary) {
+        setSummaryData(offlineSummary);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       const response = await api.post('/ai/summary', { note_id: noteId, force_refresh: forceRefresh });
       setSummaryData(response.data);
       // Track reading progress
       api.post('/progress/view', { note_id: noteId }).catch(() => {});
     } catch (err) {
+      if (!err?.response || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        const offlineSummary = await buildOfflineSummaryFallback();
+        if (offlineSummary) {
+          setSummaryData(offlineSummary);
+          setLoading(false);
+          return;
+        }
+      }
       console.error("Failed to fetch summary:", err);
       setError("Failed to generate summary. The document might not contain readable text.");
     } finally {

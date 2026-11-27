@@ -37,6 +37,7 @@ export async function enqueueOfflineUpload({
   endpoint,
   file,
   liveTranscript = '',
+  extractedText = '',
 }) {
   const db = await openUploadsDb();
   const id = `offline_upload_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -49,6 +50,7 @@ export async function enqueueOfflineUpload({
     unit_code: (unitCode || 'GENERAL').trim() || 'GENERAL',
     endpoint: endpoint || '/notes/upload',
     live_transcript: liveTranscript || '',
+    extracted_text: extractedText || liveTranscript || '',
     file,
     size: file?.size || 0,
     created_at: new Date().toISOString(),

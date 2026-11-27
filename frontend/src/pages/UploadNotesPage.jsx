@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar';
 import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
 import { enqueueOfflineUpload } from '../utils/offlineUploads';
+import { extractTextFromFileClient } from '../utils/offlineExtractor';
 
 export default function UploadNotesPage() {
   const { isDark } = useTheme();
@@ -93,6 +94,7 @@ export default function UploadNotesPage() {
     const queueFileOffline = async (file, endpoint, isImage) => {
       const extMatch = file.name.match(/\.([^/.]+)$/);
       const ext = isImage ? 'ocr_image' : (extMatch ? extMatch[1].toLowerCase() : 'doc');
+      const extractedText = isImage ? '' : await extractTextFromFileClient(file);
       await enqueueOfflineUpload({
         title: file.name.replace(/\.[^/.]+$/, ''),
         filename: file.name,
@@ -101,6 +103,7 @@ export default function UploadNotesPage() {
         unitCode: selectedUnit || 'GENERAL',
         endpoint,
         file,
+        extractedText,
       });
       return { name: file.name, ok: true, offlineQueued: true };
     };

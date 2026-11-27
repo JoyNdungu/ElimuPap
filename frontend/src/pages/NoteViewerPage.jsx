@@ -4,6 +4,13 @@ import Sidebar from '../components/Sidebar';
 import { useTheme } from '../context/ThemeContext';
 import { getOfflineFileUrl, FILES_CACHE_NAME } from '../utils/offlineSync';
 import { getPendingUploadById } from '../utils/offlineUploads';
+import { extractTextFromFileClient } from '../utils/offlineExtractor';
+import { getCachedResponse, saveCachedResponse } from '../utils/offlineCache';
+import {
+  generateOfflineSummary,
+  generateOfflineFlashcards,
+  generateOfflineMindMap,
+} from '../utils/offlineAiTools';
 import api from '../api/axios';
 
 const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
@@ -267,6 +274,7 @@ export default function NoteViewerPage() {
   const [toolLoading, setToolLoading] = useState(false);
   const [toolError, setToolError] = useState('');
   const [mobileTab, setMobileTab] = useState('doc'); // 'doc' | 'tools'
+  const [showPdfTextFallback, setShowPdfTextFallback] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -282,13 +290,12 @@ export default function NoteViewerPage() {
           return;
         }
 
-        let textContent = pending.live_transcript || '';
-        if (['txt', 'md'].includes(pending.file_type) && pending.file) {
-          try {
-            textContent = await pending.file.text();
-          } catch {}
+        let textContent = pending.extracted_text || pending.live_transcript || '';
+        if (!textContent && pending.file && pending.file_type !== 'ocr_image' && pending.file_type !== 'audio_lecture') {
+          textContent = await extractTextFromFileClient(pending.file);
         }
 
+        if (!active) return;
         setNote({
           id: pending.id,
           title: pending.title,
@@ -346,12 +353,40 @@ export default function NoteViewerPage() {
     }
   };
 
+  const buildOfflineToolResult = (toolEndpoint, sourceNote) => {
+    const cached = getCachedResponse('post', `/ai/${toolEndpoint}`, { note_id: noteId });
+    if (cached) return cached;
+
+    let generated = null;
+    if (toolEndpoint === 'summary') generated = generateOfflineSummary(sourceNote);
+    else if (toolEndpoint === 'flashcards') generated = generateOfflineFlashcards(sourceNote);
+    else if (toolEndpoint === 'mindmap') generated = generateOfflineMindMap(sourceNote);
+
+    if (generated) {
+      saveCachedResponse('post', `/ai/${toolEndpoint}`, { note_id: noteId }, generated);
+    }
+    return generated;
+  };
+
   const handleRunTool = async (toolEndpoint, toolName) => {
     setActiveTool(toolName);
     setMobileTab('tools');
     setToolLoading(true);
     setToolData(null);
     setToolError('');
+
+    // Offline-uploaded notes don't exist on the server yet — generate directly offline
+    if (note?.isOfflinePending || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      try {
+        const offlineRes = buildOfflineToolResult(toolEndpoint, note || { title: 'Study Note' });
+        if (offlineRes) {
+          setToolData(offlineRes);
+          setToolLoading(false);
+          return;
+        }
+      } catch {}
+    }
+
     try {
       const token = localStorage.getItem('elimupap_token');
       const res = await api.post(`/ai/${toolEndpoint}`, { note_id: noteId }, {
@@ -368,6 +403,13 @@ export default function NoteViewerPage() {
         }).catch(() => {});
       }
     } catch (err) {
+      if (!err?.response || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        const offlineRes = buildOfflineToolResult(toolEndpoint, note || { title: 'Study Note' });
+        if (offlineRes) {
+          setToolData(offlineRes);
+          return;
+        }
+      }
       setToolError(err.response?.data?.detail || `Failed to generate ${toolName}`);
     } finally {
       setToolLoading(false);
@@ -471,11 +513,44 @@ export default function NoteViewerPage() {
         );
       }
       return (
-        <iframe
-          src={`${pdfViewUrl}#view=FitH`}
-          className="w-full h-full border-none"
-          title="Document Viewer"
-        />
+        <div className="w-full h-full flex flex-col">
+          {(isOffline || note?.isOfflinePending) && pdfViewUrl && (
+            <div className={`px-3 py-2 flex items-center justify-between gap-2 text-[11px] border-b ${
+              isDark ? 'bg-[#171723] border-white/10 text-gray-300' : 'bg-white border-slate-200 text-slate-700'
+            }`}>
+              <a
+                href={pdfViewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1 rounded-lg bg-[#2563EB] text-white font-semibold hover:bg-[#1D4ED8] transition"
+              >
+                Open PDF Fullscreen ↗
+              </a>
+              {note?.extracted_text && (
+                <button
+                  type="button"
+                  onClick={() => setShowPdfTextFallback((v) => !v)}
+                  className={`px-2.5 py-1 rounded-lg border font-medium transition ${
+                    isDark ? 'border-white/15 hover:bg-white/5 text-blue-300' : 'border-slate-200 hover:bg-slate-50 text-[#2563EB]'
+                  }`}
+                >
+                  {showPdfTextFallback ? 'Show PDF View' : 'Read Extracted Text'}
+                </button>
+              )}
+            </div>
+          )}
+          {showPdfTextFallback && note?.extracted_text ? (
+            <div className="w-full flex-1 overflow-y-auto">
+              <FallbackText text={note.extracted_text} />
+            </div>
+          ) : (
+            <iframe
+              src={`${pdfViewUrl}#view=FitH`}
+              className="w-full flex-1 border-none"
+              title="Document Viewer"
+            />
+          )}
+        </div>
       );
     }
 
@@ -742,6 +817,14 @@ export default function NoteViewerPage() {
                   <p className={`text-sm text-center ${isDark ? 'text-red-400' : 'text-red-600'}`}>{toolError}</p>
                 ) : toolData && (
                   <div className="animate-fade-in space-y-4">
+                    {toolData.offline_generated && (
+                      <div className={`px-3 py-2 rounded-xl border text-[11px] font-medium flex items-center gap-2 ${
+                        isDark ? 'bg-amber-500/10 border-amber-500/25 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800'
+                      }`}>
+                        <span>⚡</span>
+                        <span>Generated offline on this device from your document text.</span>
+                      </div>
+                    )}
 
                     {/* SUMMARY */}
                     {activeTool === 'Summary' && toolData.summary && (
