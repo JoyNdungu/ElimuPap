@@ -16,17 +16,23 @@ import api from '../api/axios';
 const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
 
 // ── Mammoth DOCX renderer ────────────────────────────────────────────────────
-function DocxViewer({ fileUrl }) {
+function DocxViewer({ fileUrl, fallbackText }) {
+  const { isDark } = useTheme();
   const [html, setHtml] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setErr('');
     async function render() {
       try {
         const mammoth = (await import('mammoth')).default;
         const res = await fetch(fileUrl);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
         const arrayBuffer = await res.arrayBuffer();
         const result = await mammoth.convertToHtml({ arrayBuffer });
         if (!cancelled) setHtml(result.value);
@@ -46,7 +52,21 @@ function DocxViewer({ fileUrl }) {
       <p className="text-sm">Rendering document…</p>
     </div>
   );
-  if (err) return <FallbackText text={`Could not render document: ${err}`} />;
+  if (err) {
+    if (fallbackText && fallbackText !== '__EXTRACTING__') {
+      return (
+        <div className="w-full h-full overflow-y-auto">
+          <div className={`mx-4 sm:mx-8 mt-6 p-3 rounded-xl text-xs border ${
+            isDark ? 'bg-blue-500/10 border-blue-500/25 text-blue-200' : 'bg-blue-50 border-blue-200 text-slate-700'
+          }`}>
+            Showing extracted document text (original DOCX formatting unavailable on server).
+          </div>
+          <FallbackText text={fallbackText} />
+        </div>
+      );
+    }
+    return <FallbackText text={`Could not render document: ${err}`} />;
+  }
 
   return (
     <div className="w-full h-full overflow-y-auto bg-white">
@@ -432,6 +452,7 @@ export default function NoteViewerPage() {
   const [offlineDocxBlob, setOfflineDocxBlob]   = useState(null);
   const [offlineAudioBlob, setOfflineAudioBlob] = useState(null);
   const [offlineImageUrl, setOfflineImageUrl]   = useState(null);
+  const [remotePdfMissing, setRemotePdfMissing] = useState(false);
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
 
   const hasPdfVersion = isNativePdf ? Boolean(pdfUrl || offlinePdfBlob) : Boolean(convertedPdfUrl);
@@ -452,7 +473,7 @@ export default function NoteViewerPage() {
     let active = true;
     const createdUrls = [];
 
-    async function resolveOrCache(remoteUrl, setter) {
+    async function resolveOrCache(remoteUrl, setter, onMissing) {
       if (!remoteUrl) return;
       const blobUrl = await getOfflineFileUrl(remoteUrl);
       if (blobUrl) {
@@ -471,6 +492,8 @@ export default function NoteViewerPage() {
           if (res && res.ok) {
             const cache = await caches.open(FILES_CACHE_NAME);
             await cache.put(remoteUrl, res.clone());
+          } else if (res && res.status === 404 && onMissing && active) {
+            onMissing();
           }
         } catch {}
       }
@@ -480,8 +503,9 @@ export default function NoteViewerPage() {
     setOfflineDocxBlob(null);
     setOfflineAudioBlob(null);
     setOfflineImageUrl(null);
+    setRemotePdfMissing(false);
 
-    if (rawPdfViewUrl) resolveOrCache(rawPdfViewUrl, setOfflinePdfBlob);
+    if (rawPdfViewUrl) resolveOrCache(rawPdfViewUrl, setOfflinePdfBlob, () => setRemotePdfMissing(true));
     if (isDocx && fileUrl) resolveOrCache(fileUrl, setOfflineDocxBlob);
     if (isAudio && rawAudioUrl) resolveOrCache(rawAudioUrl, setOfflineAudioBlob);
 
@@ -499,14 +523,16 @@ export default function NoteViewerPage() {
   function renderViewer() {
     // 1. PDF ready (native, converted, or offline Blob URL)
     if (hasPdfVersion) {
-      if (isOffline && !offlinePdfBlob) {
-        // Gracefully show extracted text offline if PDF binary wasn't synced yet
+      if ((isOffline || remotePdfMissing) && !offlinePdfBlob) {
+        // Gracefully show extracted text if offline or if server restarted and cleared ephemeral disk
         return (
           <div className="w-full h-full overflow-y-auto">
             <div className={`mx-6 mt-6 p-3 rounded-xl text-xs border ${
               isDark ? 'bg-amber-500/10 border-amber-500/25 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800'
             }`}>
-              Showing saved offline text transcript (connect to Wi-Fi and click <strong>Sync Offline</strong> in the sidebar to cache full PDF formatting).
+              {remotePdfMissing
+                ? 'Showing extracted document text (original PDF file is unavailable on the server after restart).'
+                : 'Showing saved offline text transcript.'}
             </div>
             <FallbackText text={note?.extracted_text} />
           </div>
@@ -570,7 +596,7 @@ export default function NoteViewerPage() {
       if (isOffline && !offlineDocxBlob) {
         return <FallbackText text={note?.extracted_text} />;
       }
-      return <DocxViewer fileUrl={resolvedFileUrl} />;
+      return <DocxViewer fileUrl={resolvedFileUrl} fallbackText={note?.extracted_text} />;
     }
 
     // 4. PPTX → slide-card layout from extracted text

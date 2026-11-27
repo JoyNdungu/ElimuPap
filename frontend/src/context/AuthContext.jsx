@@ -24,16 +24,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true); // true until initial /auth/me resolves
 
   // ── Persist helpers ────────────────────────────────────
-  const persistSession = useCallback((jwt, userData) => {
-    localStorage.setItem(TOKEN_KEY, jwt);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
-    setToken(jwt);
-    setUser(userData);
-  }, []);
-
-  const clearSession = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+  const clearCachedStudyData = useCallback(() => {
     localStorage.removeItem('elimupap_offline_meta');
     localStorage.removeItem('elimupap_sync_queue');
     Object.keys(localStorage)
@@ -42,9 +33,31 @@ export function AuthProvider({ children }) {
     if (typeof caches !== 'undefined') {
       caches.delete('elimupap-files-v1').catch(() => {});
     }
+  }, []);
+
+  const persistSession = useCallback((jwt, userData) => {
+    try {
+      const prevUserRaw = localStorage.getItem(USER_KEY);
+      const prevUser = prevUserRaw ? JSON.parse(prevUserRaw) : null;
+      if (prevUser?.id && userData?.id && prevUser.id !== userData.id) {
+        clearCachedStudyData();
+      }
+    } catch {}
+
+    localStorage.setItem(TOKEN_KEY, jwt);
+    localStorage.setItem(USER_KEY, JSON.stringify(userData));
+    setToken(jwt);
+    setUser(userData);
+    window.dispatchEvent(new CustomEvent('elimupap:auth-changed', { detail: { user: userData } }));
+  }, [clearCachedStudyData]);
+
+  const clearSession = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    clearCachedStudyData();
     setToken(null);
     setUser(null);
-  }, []);
+  }, [clearCachedStudyData]);
 
   // ── Rehydrate on app load ──────────────────────────────
   // Try restoring the user from /auth/me using the stored token.

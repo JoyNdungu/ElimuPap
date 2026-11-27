@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext';
 
 function validate(fields) {
   const errors = {};
+  const cleanEmail = fields.email.trim();
   if (!fields.name.trim()) errors.name = 'Name is required.';
-  if (!fields.email.trim()) errors.email = 'Email is required.';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) errors.email = 'Enter a valid email address.';
+  if (!cleanEmail) errors.email = 'Email is required.';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) errors.email = 'Enter a valid email address.';
   if (!fields.university.trim()) errors.university = 'University is required.';
   if (!fields.course.trim()) errors.course = 'Course is required.';
   if (!fields.year_of_study.trim()) errors.year_of_study = 'Year of study is required.';
@@ -56,11 +57,11 @@ export default function RegisterPage() {
     setApiError('');
     try {
       await register({ 
-        name: fields.name, 
-        email: fields.email, 
-        university: fields.university,
-        course: fields.course,
-        year_of_study: fields.year_of_study,
+        name: fields.name.trim(), 
+        email: fields.email.trim(), 
+        university: fields.university.trim(),
+        course: fields.course.trim(),
+        year_of_study: fields.year_of_study.trim(),
         password: fields.password 
       });
       navigate('/dashboard', { replace: true });
@@ -152,6 +153,9 @@ export default function RegisterPage() {
                 name="email"
                 type="email"
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 placeholder="name@example.com"
                 className={`w-full pl-10 pr-4 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:border-transparent transition-shadow ${errors.email ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#5B57FF]'}`}
                 style={{ backgroundColor: '#11111a', border: `1px solid ${errors.email ? '#ef4444' : '#2d2d4a'}` }}

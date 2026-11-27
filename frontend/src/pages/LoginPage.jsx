@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 
 function validate(fields) {
   const errors = {};
-  if (!fields.email.trim()) errors.email = 'Email is required.';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) errors.email = 'Enter a valid email address.';
+  const cleanEmail = fields.email.trim();
+  if (!cleanEmail) errors.email = 'Email is required.';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) errors.email = 'Enter a valid email address.';
   if (!fields.password) errors.password = 'Password is required.';
   return errors;
 }
@@ -40,7 +41,7 @@ export default function LoginPage() {
     setLoading(true);
     setApiError('');
     try {
-      await login(fields);
+      await login({ email: fields.email.trim(), password: fields.password });
       navigate(from, { replace: true });
     } catch (err) {
       const msg = err?.response?.data?.detail || err?.message || 'Login failed. Please check your credentials.';
@@ -102,6 +103,9 @@ export default function LoginPage() {
                 name="email"
                 type="email"
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 placeholder="name@example.com"
                 className={`w-full pl-10 pr-4 py-2.5 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:border-transparent transition-shadow ${errors.email ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#5B57FF]'}`}
                 style={{ backgroundColor: '#11111a', border: `1px solid ${errors.email ? '#ef4444' : '#2d2d4a'}` }}

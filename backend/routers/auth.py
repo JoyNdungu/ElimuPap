@@ -4,6 +4,7 @@ from models.user import UserRegister, UserLogin
 from utils.auth import hash_password, verify_password, create_access_token
 from bson import ObjectId
 from datetime import datetime
+import re
 
 # APIRouter groups related endpoints together
 # All routes here are prefixed with /auth
@@ -21,8 +22,12 @@ def register(user: UserRegister):
     3. Save to MongoDB
     4. Return JWT token
     """
-    # Check if email already exists in database
-    existing = users_collection.find_one({"email": user.email})
+    clean_email = user.email.strip().lower()
+
+    # Check case-insensitively if email already exists in database
+    existing = users_collection.find_one(
+        {"email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}}
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -31,12 +36,12 @@ def register(user: UserRegister):
 
     # Build the user document to save in MongoDB
     user_doc = {
-        "name": user.name,
-        "email": user.email,
+        "name": user.name.strip(),
+        "email": clean_email,
         "password": hash_password(user.password),
-        "university": user.university,
-        "course": user.course,
-        "year_of_study": user.year_of_study,
+        "university": user.university.strip(),
+        "course": user.course.strip(),
+        "year_of_study": user.year_of_study.strip(),
         "language": user.language,
         "is_premium": False,
         "created_at": datetime.utcnow()
@@ -55,11 +60,11 @@ def register(user: UserRegister):
         "token": token,
         "user": {
             "id": user_id,
-            "name": user.name,
-            "email": user.email,
-            "university": user.university,
-            "course": user.course,
-            "year_of_study": user.year_of_study,
+            "name": user_doc["name"],
+            "email": clean_email,
+            "university": user_doc["university"],
+            "course": user_doc["course"],
+            "year_of_study": user_doc["year_of_study"],
             "language": user.language
         }
     }
@@ -69,12 +74,16 @@ def login(credentials: UserLogin):
     """
     Log in an existing student.
     Process:
-    1. Find user by email
+    1. Find user by email (case-insensitive & trimmed for mobile/cross-device login)
     2. Verify password
     3. Return JWT token
     """
-    # Find user by email
-    user = users_collection.find_one({"email": credentials.email})
+    clean_email = credentials.email.strip().lower()
+
+    # Find user by normalized email first, then case-insensitive fallback for older accounts
+    user = users_collection.find_one({"email": clean_email}) or users_collection.find_one(
+        {"email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}}
+    )
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -82,7 +91,12 @@ def login(credentials: UserLogin):
         )
 
     # Verify password against stored hash
-    if not verify_password(credentials.password, user["password"]):
+    try:
+        password_ok = verify_password(credentials.password, user["password"])
+    except Exception:
+        password_ok = False
+
+    if not password_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
